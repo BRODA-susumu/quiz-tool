@@ -15,50 +15,61 @@
   body{
     margin:0; min-height:100vh; background:var(--bg); color:var(--text);
     font-family:"Noto Sans JP",-apple-system,BlinkMacSystemFont,sans-serif;
-    padding:18px;
+    padding:18px 18px 120px;
   }
-  .wrap{max-width:1100px; margin:0 auto; display:flex; flex-direction:column; gap:14px;}
+  .wrap{max-width:1120px; margin:0 auto; display:flex; flex-direction:column; gap:14px;}
   h1{font-size:17px; font-weight:900; letter-spacing:.08em; color:var(--sub); margin:0; text-align:center;}
+  h2{font-size:13px; font-weight:900; color:var(--sub); margin:0 0 8px; letter-spacing:.06em;}
   .row{display:flex; gap:8px; flex-wrap:wrap; align-items:center;}
-  input[type=text]{
+  input[type=text], textarea, select{
     background:var(--panel); border:2px solid var(--line); border-radius:10px;
     color:var(--text); font-size:15px; font-weight:700; padding:10px 14px; outline:none; font-family:inherit;
   }
-  input[type=text]:focus{border-color:var(--blue1);}
-  input::placeholder{color:#5f6f92; font-weight:500;}
+  textarea{resize:vertical; min-height:52px; line-height:1.4; width:100%;}
+  input[type=text]:focus, textarea:focus, select:focus{border-color:var(--blue1);}
+  input::placeholder, textarea::placeholder{color:#5f6f92; font-weight:500;}
   button{
     border:none; border-radius:10px; font-family:inherit; font-weight:900; font-size:14px;
     padding:11px 16px; cursor:pointer; color:#fff; background:linear-gradient(180deg,#4a5878,#323d58);
   }
   button:active{transform:translateY(1px);}
   button:disabled{opacity:.4; cursor:default;}
-  button.primary{background:linear-gradient(180deg,var(--blue1),var(--blue2)); font-size:16px; padding:13px 22px;}
-  button.warn{background:linear-gradient(180deg,#e8a11e,#a06b0b);}
+  button.primary{background:linear-gradient(180deg,var(--blue1),var(--blue2)); font-size:16px; padding:13px 20px;}
+  button.gold{background:linear-gradient(180deg,#e8a11e,#a06b0b);}
+  button.green{background:linear-gradient(180deg,#1ba85a,#0c7a3e);}
   button.danger{background:linear-gradient(180deg,var(--red1),var(--red2));}
   .status{font-size:12px; font-weight:700; color:var(--sub); min-height:16px;}
   .status.on{color:#39d98a;}
   .status.err{color:#ff6b6b;}
 
-  /* URL共有 */
-  .links{display:flex; flex-direction:column; gap:6px; background:var(--panel); border:1px solid var(--line); border-radius:12px; padding:12px 14px; font-size:13px;}
+  .card{background:var(--panel); border:1px solid var(--line); border-radius:12px; padding:14px;}
+
+  .links{display:flex; flex-direction:column; gap:6px; font-size:13px;}
   .links .lrow{display:flex; gap:8px; align-items:center; flex-wrap:wrap;}
   .links b{color:var(--sub); min-width:5.5em;}
   .links code{background:var(--panel2); padding:4px 8px; border-radius:6px; font-size:12px; word-break:break-all; flex:1; min-width:200px;}
   .links button{padding:6px 10px; font-size:12px;}
 
+  /* 問題パネル */
+  .qrow{display:flex; gap:8px; flex-wrap:wrap; align-items:center; margin-top:8px;}
+  .qrow select{flex:1; min-width:180px;}
+
   /* 回答者リスト */
   .players{display:flex; flex-direction:column; gap:8px;}
   .player{
-    display:grid; grid-template-columns:auto auto 1fr auto auto auto; gap:10px; align-items:center;
-    background:var(--panel); border:1px solid var(--line); border-radius:12px; padding:10px 14px;
+    display:grid; grid-template-columns:auto 1fr auto auto auto; gap:10px; align-items:center;
+    background:var(--panel); border:1px solid var(--line); border-radius:12px; padding:10px 12px;
   }
-  .player .pts{width:70px; background:var(--panel2); border:2px solid var(--line); border-radius:8px;
-    color:#ffe14d; font-size:16px; font-weight:900; padding:8px 6px; text-align:center; outline:none; font-family:inherit;}
-  .player .pts:focus{border-color:var(--blue1);}
-  .player .name{font-size:16px; font-weight:900; white-space:nowrap; max-width:10em; overflow:hidden; text-overflow:ellipsis;}
+  .ptbox{display:flex; align-items:center; gap:4px;}
+  .ptbox .pts{width:56px; background:var(--panel2); border:2px solid var(--line); border-radius:8px;
+    color:#ffe14d; font-size:16px; font-weight:900; padding:8px 4px; text-align:center; outline:none; font-family:inherit;}
+  .ptbox .pts:focus{border-color:var(--blue1);}
+  .ptbtn{width:34px; height:38px; padding:0; font-size:20px; line-height:1; background:linear-gradient(180deg,#3a466a,#2a3652); border-radius:8px;}
+  .nameans{display:flex; flex-direction:column; gap:4px; min-width:0;}
+  .player .name{font-size:15px; font-weight:900; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;}
   .player .ans{
     background:var(--panel2); border-radius:8px; padding:8px 12px; font-size:14px; font-weight:700;
-    min-height:36px; white-space:pre-wrap; overflow-wrap:anywhere; word-break:break-all; color:#dbe5f7;
+    min-height:34px; white-space:pre-wrap; overflow-wrap:anywhere; word-break:break-all; color:#dbe5f7;
     max-height:110px; overflow-y:auto;
   }
   .player .ans:empty::before{content:"（未回答）"; color:#5f6f92; font-weight:500;}
@@ -72,12 +83,17 @@
   label.chk.correct input{accent-color:var(--red1);}
   .del{background:none; color:#5f6f92; font-size:16px; padding:6px 8px;}
   .del:hover{color:#ff6b6b;}
-  .empty{color:var(--sub); text-align:center; padding:30px 0; font-weight:700;}
+  .empty{color:var(--sub); text-align:center; padding:26px 0; font-weight:700;}
 
-  /* 操作バー */
+  .toolbar{display:flex; gap:8px; flex-wrap:wrap; align-items:center;}
+  .modechk{display:flex; align-items:center; gap:6px; font-size:13px; font-weight:900; cursor:pointer;
+    padding:9px 12px; border-radius:8px; border:2px solid #6a5a1e; color:#ffcf5a; user-select:none;}
+  .modechk input{width:18px; height:18px; accent-color:#e8a11e; margin:0;}
+
+  /* 操作バー(固定) */
   .controls{
-    position:sticky; bottom:0; background:rgba(14,21,36,.92); backdrop-filter:blur(6px);
-    border-top:1px solid var(--line); margin:0 -18px; padding:14px 18px;
+    position:fixed; left:0; right:0; bottom:0; background:rgba(14,21,36,.94); backdrop-filter:blur(6px);
+    border-top:1px solid var(--line); padding:12px 18px;
     display:flex; gap:10px; flex-wrap:wrap; align-items:center; justify-content:center;
   }
   .controls .sep{flex:0 0 1px; height:32px; background:var(--line);}
@@ -94,20 +110,43 @@
     <span class="status" id="status"></span>
   </div>
 
-  <div class="links" id="links" style="display:none;">
+  <div class="card links" id="links" style="display:none;">
     <div class="lrow"><b>回答者用</b><code id="answerUrl"></code><button data-copy="answerUrl">コピー</button></div>
     <div class="lrow"><b>OBS表示用</b><code id="displayUrl"></code><button data-copy="displayUrl">コピー</button></div>
+  </div>
+
+  <!-- 問題表示モード -->
+  <div class="card" id="qpanel" style="display:none;">
+    <h2>問題表示</h2>
+    <textarea id="qInput" placeholder="ここに現在の問題文を入力"></textarea>
+    <div class="qrow">
+      <button class="primary" id="qShowBtn">📖 表示</button>
+      <button class="green" id="qSaveBtn">💾 保存</button>
+      <button id="qResetBtn">入力クリア</button>
+      <button class="danger" id="qHideBtn">問題を消す</button>
+    </div>
+    <div class="qrow">
+      <select id="qSelect"><option value="">― 保存した問題を選ぶ ―</option></select>
+      <button id="qDeleteBtn">選択を削除</button>
+    </div>
+  </div>
+
+  <!-- 回答者リスト操作 -->
+  <div class="toolbar" id="listTools" style="display:none;">
+    <button id="checkAllBtn">☑ 全員を表示にチェック</button>
+    <button id="uncheckAllBtn">▢ 表示チェックを全解除</button>
+    <label class="modechk"><input type="checkbox" id="autoAwardChk">正解で自動+1</label>
   </div>
 
   <div class="players" id="players"><div class="empty">入室すると回答者が表示されます</div></div>
 </div>
 
 <div class="controls" id="controls" style="display:none;">
-  <button class="primary" id="showBtn">📺 OBSに表示</button>
-  <label class="chk" style="border-color:#3d4f78;"><input type="checkbox" id="showPointsChk">ポイントも表示</label>
-  <button class="warn" id="pointsBtn">🏅 ポイントを一括反映</button>
+  <button class="primary" id="showBtn">📺 OBSに回答を表示</button>
+  <button class="gold" id="showPtsBtn">🏅 回答欄にポイントを表示</button>
+  <label class="chk show"><input type="checkbox" id="showPointsChk">名前の横にptを表示</label>
   <div class="sep"></div>
-  <button id="hideBtn">表示を消す</button>
+  <button id="hideBtn">回答を消す</button>
   <button class="danger" id="resetBtn">リセット</button>
   <div class="obsState" id="obsState"></div>
 </div>
@@ -121,9 +160,11 @@ const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 const $ = id => document.getElementById(id);
 let room = "", channel = null;
 let players = [];                       // {id, name, answer, points, created_at}
-const checks = new Map();               // id -> {show:bool, correct:bool}
-const pendingPts = new Map();           // id -> 入力中のポイント値(未保存)
-let lastPublished = null;
+const checks = new Map();               // id -> {show, correct}
+const pendingPts = new Map();           // id -> 入力中の未保存ポイント
+
+// 現在のOBS表示状態(部分更新のため保持)
+let display = { items: [], showPoints: false, contentMode: "answer", question: "" };
 
 function setStatus(msg, cls){ $("status").textContent = msg; $("status").className = "status " + (cls||""); }
 function setObsState(msg){ $("obsState").textContent = msg; }
@@ -143,15 +184,24 @@ async function join(){
   $("joinBtn").textContent = "入室中";
   setStatus("接続中…");
 
-  // 共有URL表示
   const base = location.href.replace(/[^/]*$/, "");
   $("answerUrl").textContent  = base + "answer.html?room=" + encodeURIComponent(room);
   $("displayUrl").textContent = base + "display.html?room=" + encodeURIComponent(room);
   $("links").style.display = "";
-  $("controls").style.display = "";
+  $("qpanel").style.display = "";
+  $("listTools").style.display = "flex";
+  $("controls").style.display = "flex";
+
+  loadSavedQuestions();
 
   try {
     await reload();
+    const { data } = await sb.from("quiz_display").select("payload").eq("room_code", room).maybeSingle();
+    if (data && data.payload){
+      display = Object.assign({ items: [], showPoints:false, contentMode:"answer", question:"" }, data.payload);
+      $("qInput").value = display.question || "";
+      $("showPointsChk").checked = !!display.showPoints;
+    }
     subscribe();
     setStatus(`ルーム「${room}」に接続中`, "on");
   } catch (err) {
@@ -162,10 +212,8 @@ async function join(){
 
 document.querySelectorAll("[data-copy]").forEach(btn => {
   btn.addEventListener("click", async () => {
-    try {
-      await navigator.clipboard.writeText($(btn.dataset.copy).textContent);
-      btn.textContent = "✓"; setTimeout(() => btn.textContent = "コピー", 1200);
-    } catch(e){}
+    try { await navigator.clipboard.writeText($(btn.dataset.copy).textContent);
+      btn.textContent = "✓"; setTimeout(() => btn.textContent = "コピー", 1200); } catch(e){}
   });
 });
 
@@ -183,19 +231,17 @@ function subscribe(){
     .on("postgres_changes",
       { event: "*", schema: "public", table: "quiz_players", filter: "room_code=eq." + room },
       payload => {
-        if (payload.eventType === "INSERT") {
-          players.push(payload.new);
-        } else if (payload.eventType === "UPDATE") {
+        if (payload.eventType === "INSERT") players.push(payload.new);
+        else if (payload.eventType === "UPDATE"){
           const i = players.findIndex(p => p.id === payload.new.id);
           if (i >= 0) players[i] = payload.new; else players.push(payload.new);
-        } else if (payload.eventType === "DELETE") {
+        } else if (payload.eventType === "DELETE"){
           players = players.filter(p => p.id !== payload.old.id);
           checks.delete(payload.old.id);
         }
         renderPlayers();
       })
     .subscribe();
-  // 保険: 20秒ごとにポーリング
   setInterval(() => reload().catch(()=>{}), 20000);
 }
 
@@ -214,39 +260,48 @@ function renderPlayers(){
     const row = document.createElement("div");
     row.className = "player";
 
+    // ポイント ± 欄
+    const ptbox = document.createElement("div");
+    ptbox.className = "ptbox";
+    const minus = document.createElement("button");
+    minus.className = "ptbtn"; minus.textContent = "−"; minus.title = "-1";
+    minus.addEventListener("click", () => changePoints(p, -1));
     const pts = document.createElement("input");
     pts.className = "pts"; pts.type = "text"; pts.inputMode = "numeric";
     pts.value = pendingPts.has(p.id) ? pendingPts.get(p.id) : p.points;
     pts.title = "獲得ポイント";
     pts.addEventListener("input", () => pendingPts.set(p.id, pts.value));
     pts.addEventListener("change", async () => {
-      const v = parseInt(pts.value, 10) || 0;
-      pts.value = v;
-      pendingPts.delete(p.id);
-      p.points = v;
-      await sb.from("quiz_players").update({ points: v }).eq("id", p.id);
+      const v = parseInt(pts.value, 10) || 0; pts.value = v; pendingPts.delete(p.id);
+      p.points = v; await savePoints(p.id, v);
     });
+    const plus = document.createElement("button");
+    plus.className = "ptbtn"; plus.textContent = "+"; plus.title = "+1";
+    plus.addEventListener("click", () => changePoints(p, +1));
+    ptbox.append(minus, pts, plus);
 
-    const name = document.createElement("div");
-    name.className = "name"; name.textContent = p.name;
-
-    const ans = document.createElement("div");
-    ans.className = "ans"; ans.textContent = p.answer || "";
+    // 名前 + 回答
+    const na = document.createElement("div");
+    na.className = "nameans";
+    const name = document.createElement("div"); name.className = "name"; name.textContent = p.name;
+    const ans = document.createElement("div"); ans.className = "ans"; ans.textContent = p.answer || "";
+    na.append(name, ans);
 
     const showL = mkCheck("表示", "show", c.show, v => { c.show = v; });
-    const okL   = mkCheck("正解", "correct", c.correct, v => { c.correct = v; });
+    const okL   = mkCheck("正解", "correct", c.correct, async v => {
+      c.correct = v;
+      if (v && $("autoAwardChk").checked) await changePoints(p, +1);  // 自動+1(外しても減らさない)
+    });
 
     const del = document.createElement("button");
     del.className = "del"; del.textContent = "✕"; del.title = "この回答者を削除";
     del.addEventListener("click", async () => {
       if (!confirm(`「${p.name}」を削除しますか？`)) return;
       await sb.from("quiz_players").delete().eq("id", p.id);
-      players = players.filter(x => x.id !== p.id);
-      checks.delete(p.id);
-      renderPlayers();
+      players = players.filter(x => x.id !== p.id); checks.delete(p.id); renderPlayers();
     });
 
-    row.append(pts, name, ans, showL, okL, del);
+    row.append(ptbox, na, showL, okL, del);
     box.appendChild(row);
   });
 }
@@ -261,66 +316,114 @@ function mkCheck(label, cls, checked, onChange){
   return l;
 }
 
-// ===== 表示制御 =====
-function buildPayload(){
-  const items = players
-    .filter(p => checks.get(p.id)?.show)
-    .map(p => ({
-      name: p.name,
-      answer: p.answer || "",
-      points: p.points || 0,
-      correct: !!checks.get(p.id)?.correct
-    }));
-  return { items, showPoints: $("showPointsChk").checked };
+async function savePoints(id, v){ await sb.from("quiz_players").update({ points: v }).eq("id", id); }
+async function changePoints(p, delta){
+  p.points = (parseInt(p.points, 10) || 0) + delta;
+  pendingPts.delete(p.id);
+  renderPlayers();
+  await savePoints(p.id, p.points);
 }
 
-async function publish(payload){
+// ===== 一括チェック =====
+$("checkAllBtn").addEventListener("click", () => {
+  players.forEach(p => { if (!checks.has(p.id)) checks.set(p.id, {show:false,correct:false}); checks.get(p.id).show = true; });
+  renderPlayers();
+});
+$("uncheckAllBtn").addEventListener("click", () => { checks.forEach(c => c.show = false); renderPlayers(); });
+
+// ===== OBS 表示制御 =====
+function shownItems(){
+  return players.filter(p => checks.get(p.id)?.show).map(p => ({
+    name: p.name, answer: p.answer || "", points: p.points || 0, correct: !!checks.get(p.id)?.correct
+  }));
+}
+async function publish(){
   const { error } = await sb.from("quiz_display").upsert({
-    room_code: room, payload, updated_at: new Date().toISOString()
+    room_code: room, payload: display, updated_at: new Date().toISOString()
   });
-  if (error) { setObsState("送信エラー: " + error.message); return false; }
-  lastPublished = payload;
+  if (error){ setObsState("送信エラー: " + error.message); return false; }
   return true;
 }
 
 $("showBtn").addEventListener("click", async () => {
-  const payload = buildPayload();
-  if (!payload.items.length){ setObsState("「表示」にチェックが入っている回答者がいません"); return; }
-  if (await publish(payload))
-    setObsState(`OBSに ${payload.items.length}人 表示中 (${payload.items.map(i=>i.name).join("、")})`);
+  const items = shownItems();
+  if (!items.length){ setObsState("「表示」にチェックが入っている回答者がいません"); return; }
+  display.items = items; display.contentMode = "answer"; display.showPoints = $("showPointsChk").checked;
+  if (await publish()) setObsState(`OBSに ${items.length}人 の回答を表示中`);
 });
 
-// ポイント一括反映: 表示中の内容にポイントを載せる(表示ONに)
-$("pointsBtn").addEventListener("click", async () => {
-  $("showPointsChk").checked = true;
-  let payload;
-  if (lastPublished && lastPublished.items.length){
-    // 表示中のメンバーはそのまま、ポイントだけ最新化
-    const items = lastPublished.items.map(it => {
-      const p = players.find(x => x.name === it.name);
-      return { ...it, points: p ? (p.points || 0) : it.points };
-    });
-    payload = { items, showPoints: true };
-  } else {
-    payload = buildPayload();
-    if (!payload.items.length){ setObsState("先に「OBSに表示」するか、表示にチェックを入れてください"); return; }
-  }
-  if (await publish(payload)) setObsState("ポイントを表示に反映しました");
+$("showPtsBtn").addEventListener("click", async () => {
+  const items = shownItems();
+  if (!items.length){ setObsState("「表示」にチェックが入っている回答者がいません"); return; }
+  display.items = items; display.contentMode = "points";
+  if (await publish()) setObsState(`OBSに ${items.length}人 のポイントを表示中`);
+});
+
+$("showPointsChk").addEventListener("change", async () => {
+  display.showPoints = $("showPointsChk").checked;
+  if (display.items.length && display.contentMode === "answer") await publish();
 });
 
 $("hideBtn").addEventListener("click", async () => {
-  if (await publish({ items: [], showPoints: false })) setObsState("表示を消しました");
+  display.items = []; display.contentMode = "answer";
+  if (await publish()) setObsState("回答表示を消しました" + (display.question ? "（問題文は表示中）" : ""));
 });
 
-// ===== リセット: 全員の回答とチェックを消す(名前・ポイントは残す) =====
 $("resetBtn").addEventListener("click", async () => {
-  if (!confirm("全員の回答・チェック・OBS表示をリセットします。よろしいですか？\n(名前とポイントは残ります)")) return;
+  if (!confirm("全員の回答・チェックとOBSの回答表示をリセットします。よろしいですか？\n(名前・ポイント・問題文は残ります)")) return;
   await sb.from("quiz_players").update({ answer: "" }).eq("room_code", room);
   checks.forEach(c => { c.show = false; c.correct = false; });
   players.forEach(p => p.answer = "");
-  await publish({ items: [], showPoints: false });
-  renderPlayers();
+  display.items = []; display.contentMode = "answer";
+  await publish(); renderPlayers();
   setObsState("リセットしました");
+});
+
+// ===== 問題表示 =====
+$("qShowBtn").addEventListener("click", async () => {
+  display.question = $("qInput").value.trim();
+  if (await publish()) setObsState(display.question ? "問題文を表示しました" : "問題文が空です");
+});
+$("qHideBtn").addEventListener("click", async () => {
+  display.question = "";
+  if (await publish()) setObsState("問題文を消しました");
+});
+$("qResetBtn").addEventListener("click", () => { $("qInput").value = ""; $("qInput").focus(); });
+
+// 保存問題(localStorage・この端末のみ)
+const LS_KEY = "quiz_saved_questions";
+function getSaved(){ try { return JSON.parse(localStorage.getItem(LS_KEY) || "[]"); } catch(e){ return []; } }
+function setSaved(arr){ try { localStorage.setItem(LS_KEY, JSON.stringify(arr)); } catch(e){} }
+function loadSavedQuestions(){
+  const sel = $("qSelect");
+  sel.innerHTML = '<option value="">― 保存した問題を選ぶ ―</option>';
+  getSaved().forEach((q, i) => {
+    const o = document.createElement("option");
+    o.value = String(i); o.textContent = q.length > 40 ? q.slice(0, 40) + "…" : q;
+    sel.appendChild(o);
+  });
+}
+$("qSaveBtn").addEventListener("click", () => {
+  const q = $("qInput").value.trim();
+  if (!q){ setObsState("保存する問題文が空です"); return; }
+  const arr = getSaved();
+  if (!arr.includes(q)){ arr.push(q); setSaved(arr); loadSavedQuestions(); setObsState("問題を保存しました"); }
+  else setObsState("同じ問題が既に保存されています");
+});
+$("qSelect").addEventListener("change", () => {
+  const v = $("qSelect").value;
+  if (v === "") return;
+  const q = getSaved()[parseInt(v, 10)];
+  if (q != null) $("qInput").value = q;
+});
+$("qDeleteBtn").addEventListener("click", () => {
+  const v = $("qSelect").value;
+  if (v === ""){ setObsState("削除する問題をプルダウンで選んでください"); return; }
+  const arr = getSaved(); const idx = parseInt(v, 10);
+  if (idx >= 0 && idx < arr.length){
+    if (!confirm(`保存した問題を削除しますか？\n「${arr[idx].slice(0,40)}」`)) return;
+    arr.splice(idx, 1); setSaved(arr); loadSavedQuestions(); setObsState("保存した問題を削除しました");
+  }
 });
 </script>
 </body>
