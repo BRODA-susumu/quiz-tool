@@ -1,0 +1,327 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>クイズ管理 - 管理者用</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@500;700;900&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --blue1:#1e6ae8; --blue2:#0b3fa0; --red1:#f0343e; --red2:#a80c1c;
+    --bg:#0e1524; --panel:#1a2338; --panel2:#212c47; --line:#2c3a5c; --text:#f2f5fb; --sub:#93a3c4;
+  }
+  *{box-sizing:border-box;}
+  body{
+    margin:0; min-height:100vh; background:var(--bg); color:var(--text);
+    font-family:"Noto Sans JP",-apple-system,BlinkMacSystemFont,sans-serif;
+    padding:18px;
+  }
+  .wrap{max-width:1100px; margin:0 auto; display:flex; flex-direction:column; gap:14px;}
+  h1{font-size:17px; font-weight:900; letter-spacing:.08em; color:var(--sub); margin:0; text-align:center;}
+  .row{display:flex; gap:8px; flex-wrap:wrap; align-items:center;}
+  input[type=text]{
+    background:var(--panel); border:2px solid var(--line); border-radius:10px;
+    color:var(--text); font-size:15px; font-weight:700; padding:10px 14px; outline:none; font-family:inherit;
+  }
+  input[type=text]:focus{border-color:var(--blue1);}
+  input::placeholder{color:#5f6f92; font-weight:500;}
+  button{
+    border:none; border-radius:10px; font-family:inherit; font-weight:900; font-size:14px;
+    padding:11px 16px; cursor:pointer; color:#fff; background:linear-gradient(180deg,#4a5878,#323d58);
+  }
+  button:active{transform:translateY(1px);}
+  button:disabled{opacity:.4; cursor:default;}
+  button.primary{background:linear-gradient(180deg,var(--blue1),var(--blue2)); font-size:16px; padding:13px 22px;}
+  button.warn{background:linear-gradient(180deg,#e8a11e,#a06b0b);}
+  button.danger{background:linear-gradient(180deg,var(--red1),var(--red2));}
+  .status{font-size:12px; font-weight:700; color:var(--sub); min-height:16px;}
+  .status.on{color:#39d98a;}
+  .status.err{color:#ff6b6b;}
+
+  /* URL共有 */
+  .links{display:flex; flex-direction:column; gap:6px; background:var(--panel); border:1px solid var(--line); border-radius:12px; padding:12px 14px; font-size:13px;}
+  .links .lrow{display:flex; gap:8px; align-items:center; flex-wrap:wrap;}
+  .links b{color:var(--sub); min-width:5.5em;}
+  .links code{background:var(--panel2); padding:4px 8px; border-radius:6px; font-size:12px; word-break:break-all; flex:1; min-width:200px;}
+  .links button{padding:6px 10px; font-size:12px;}
+
+  /* 回答者リスト */
+  .players{display:flex; flex-direction:column; gap:8px;}
+  .player{
+    display:grid; grid-template-columns:auto auto 1fr auto auto auto; gap:10px; align-items:center;
+    background:var(--panel); border:1px solid var(--line); border-radius:12px; padding:10px 14px;
+  }
+  .player .pts{width:70px; background:var(--panel2); border:2px solid var(--line); border-radius:8px;
+    color:#ffe14d; font-size:16px; font-weight:900; padding:8px 6px; text-align:center; outline:none; font-family:inherit;}
+  .player .pts:focus{border-color:var(--blue1);}
+  .player .name{font-size:16px; font-weight:900; white-space:nowrap; max-width:10em; overflow:hidden; text-overflow:ellipsis;}
+  .player .ans{
+    background:var(--panel2); border-radius:8px; padding:8px 12px; font-size:14px; font-weight:700;
+    min-height:36px; white-space:pre-wrap; overflow-wrap:anywhere; word-break:break-all; color:#dbe5f7;
+    max-height:110px; overflow-y:auto;
+  }
+  .player .ans:empty::before{content:"（未回答）"; color:#5f6f92; font-weight:500;}
+  label.chk{
+    display:flex; align-items:center; gap:6px; font-size:13px; font-weight:900; cursor:pointer;
+    padding:8px 10px; border-radius:8px; border:2px solid var(--line); user-select:none; white-space:nowrap;
+  }
+  label.chk input{width:18px; height:18px; accent-color:var(--blue1); cursor:pointer; margin:0;}
+  label.chk.show{color:#7db4ff;}
+  label.chk.correct{color:#ff9a9a;}
+  label.chk.correct input{accent-color:var(--red1);}
+  .del{background:none; color:#5f6f92; font-size:16px; padding:6px 8px;}
+  .del:hover{color:#ff6b6b;}
+  .empty{color:var(--sub); text-align:center; padding:30px 0; font-weight:700;}
+
+  /* 操作バー */
+  .controls{
+    position:sticky; bottom:0; background:rgba(14,21,36,.92); backdrop-filter:blur(6px);
+    border-top:1px solid var(--line); margin:0 -18px; padding:14px 18px;
+    display:flex; gap:10px; flex-wrap:wrap; align-items:center; justify-content:center;
+  }
+  .controls .sep{flex:0 0 1px; height:32px; background:var(--line);}
+  .obsState{font-size:12px; font-weight:700; color:var(--sub); width:100%; text-align:center;}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>QUIZ CONTROL — 管理者用</h1>
+
+  <div class="row">
+    <input type="text" id="roomInput" placeholder="ルームコード (好きな合言葉)" maxlength="32" autocomplete="off" style="flex:1; min-width:180px;">
+    <button class="primary" id="joinBtn">入室</button>
+    <span class="status" id="status"></span>
+  </div>
+
+  <div class="links" id="links" style="display:none;">
+    <div class="lrow"><b>回答者用</b><code id="answerUrl"></code><button data-copy="answerUrl">コピー</button></div>
+    <div class="lrow"><b>OBS表示用</b><code id="displayUrl"></code><button data-copy="displayUrl">コピー</button></div>
+  </div>
+
+  <div class="players" id="players"><div class="empty">入室すると回答者が表示されます</div></div>
+</div>
+
+<div class="controls" id="controls" style="display:none;">
+  <button class="primary" id="showBtn">📺 OBSに表示</button>
+  <label class="chk" style="border-color:#3d4f78;"><input type="checkbox" id="showPointsChk">ポイントも表示</label>
+  <button class="warn" id="pointsBtn">🏅 ポイントを一括反映</button>
+  <div class="sep"></div>
+  <button id="hideBtn">表示を消す</button>
+  <button class="danger" id="resetBtn">リセット</button>
+  <div class="obsState" id="obsState"></div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+<script>
+const SUPABASE_URL = "https://ooukcrjaihuggeiajsqw.supabase.co";
+const SUPABASE_KEY = "sb_publishable_Gd8q6yFNdS1CtUDQK5NH0Q_tZv6L2A6";
+const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+const $ = id => document.getElementById(id);
+let room = "", channel = null;
+let players = [];                       // {id, name, answer, points, created_at}
+const checks = new Map();               // id -> {show:bool, correct:bool}
+const pendingPts = new Map();           // id -> 入力中のポイント値(未保存)
+let lastPublished = null;
+
+function setStatus(msg, cls){ $("status").textContent = msg; $("status").className = "status " + (cls||""); }
+function setObsState(msg){ $("obsState").textContent = msg; }
+
+// ===== 入室 =====
+const params = new URLSearchParams(location.search);
+if (params.get("room")) $("roomInput").value = params.get("room").trim();
+
+$("joinBtn").addEventListener("click", join);
+$("roomInput").addEventListener("keydown", e => { if (e.key === "Enter") join(); });
+
+async function join(){
+  const r = $("roomInput").value.trim();
+  if (!r){ setStatus("ルームコードを入力してください", "err"); return; }
+  room = r;
+  $("joinBtn").disabled = true; $("roomInput").disabled = true;
+  $("joinBtn").textContent = "入室中";
+  setStatus("接続中…");
+
+  // 共有URL表示
+  const base = location.href.replace(/[^/]*$/, "");
+  $("answerUrl").textContent  = base + "answer.html?room=" + encodeURIComponent(room);
+  $("displayUrl").textContent = base + "display.html?room=" + encodeURIComponent(room);
+  $("links").style.display = "";
+  $("controls").style.display = "";
+
+  try {
+    await reload();
+    subscribe();
+    setStatus(`ルーム「${room}」に接続中`, "on");
+  } catch (err) {
+    setStatus("接続エラー: " + (err.message || err), "err");
+    $("joinBtn").disabled = false; $("roomInput").disabled = false;
+  }
+}
+
+document.querySelectorAll("[data-copy]").forEach(btn => {
+  btn.addEventListener("click", async () => {
+    try {
+      await navigator.clipboard.writeText($(btn.dataset.copy).textContent);
+      btn.textContent = "✓"; setTimeout(() => btn.textContent = "コピー", 1200);
+    } catch(e){}
+  });
+});
+
+async function reload(){
+  const { data, error } = await sb.from("quiz_players")
+    .select("*").eq("room_code", room).order("created_at", { ascending: true });
+  if (error) throw error;
+  players = data || [];
+  renderPlayers();
+}
+
+function subscribe(){
+  if (channel) sb.removeChannel(channel);
+  channel = sb.channel("admin-" + room)
+    .on("postgres_changes",
+      { event: "*", schema: "public", table: "quiz_players", filter: "room_code=eq." + room },
+      payload => {
+        if (payload.eventType === "INSERT") {
+          players.push(payload.new);
+        } else if (payload.eventType === "UPDATE") {
+          const i = players.findIndex(p => p.id === payload.new.id);
+          if (i >= 0) players[i] = payload.new; else players.push(payload.new);
+        } else if (payload.eventType === "DELETE") {
+          players = players.filter(p => p.id !== payload.old.id);
+          checks.delete(payload.old.id);
+        }
+        renderPlayers();
+      })
+    .subscribe();
+  // 保険: 20秒ごとにポーリング
+  setInterval(() => reload().catch(()=>{}), 20000);
+}
+
+// ===== リスト描画 =====
+function renderPlayers(){
+  const box = $("players");
+  box.innerHTML = "";
+  if (!players.length){
+    box.innerHTML = '<div class="empty">まだ回答者がいません。回答者用URLを共有してください。</div>';
+    return;
+  }
+  players.forEach(p => {
+    if (!checks.has(p.id)) checks.set(p.id, { show:false, correct:false });
+    const c = checks.get(p.id);
+
+    const row = document.createElement("div");
+    row.className = "player";
+
+    const pts = document.createElement("input");
+    pts.className = "pts"; pts.type = "text"; pts.inputMode = "numeric";
+    pts.value = pendingPts.has(p.id) ? pendingPts.get(p.id) : p.points;
+    pts.title = "獲得ポイント";
+    pts.addEventListener("input", () => pendingPts.set(p.id, pts.value));
+    pts.addEventListener("change", async () => {
+      const v = parseInt(pts.value, 10) || 0;
+      pts.value = v;
+      pendingPts.delete(p.id);
+      p.points = v;
+      await sb.from("quiz_players").update({ points: v }).eq("id", p.id);
+    });
+
+    const name = document.createElement("div");
+    name.className = "name"; name.textContent = p.name;
+
+    const ans = document.createElement("div");
+    ans.className = "ans"; ans.textContent = p.answer || "";
+
+    const showL = mkCheck("表示", "show", c.show, v => { c.show = v; });
+    const okL   = mkCheck("正解", "correct", c.correct, v => { c.correct = v; });
+
+    const del = document.createElement("button");
+    del.className = "del"; del.textContent = "✕"; del.title = "この回答者を削除";
+    del.addEventListener("click", async () => {
+      if (!confirm(`「${p.name}」を削除しますか？`)) return;
+      await sb.from("quiz_players").delete().eq("id", p.id);
+      players = players.filter(x => x.id !== p.id);
+      checks.delete(p.id);
+      renderPlayers();
+    });
+
+    row.append(pts, name, ans, showL, okL, del);
+    box.appendChild(row);
+  });
+}
+
+function mkCheck(label, cls, checked, onChange){
+  const l = document.createElement("label");
+  l.className = "chk " + cls;
+  const i = document.createElement("input");
+  i.type = "checkbox"; i.checked = checked;
+  i.addEventListener("change", () => onChange(i.checked));
+  l.append(i, document.createTextNode(label));
+  return l;
+}
+
+// ===== 表示制御 =====
+function buildPayload(){
+  const items = players
+    .filter(p => checks.get(p.id)?.show)
+    .map(p => ({
+      name: p.name,
+      answer: p.answer || "",
+      points: p.points || 0,
+      correct: !!checks.get(p.id)?.correct
+    }));
+  return { items, showPoints: $("showPointsChk").checked };
+}
+
+async function publish(payload){
+  const { error } = await sb.from("quiz_display").upsert({
+    room_code: room, payload, updated_at: new Date().toISOString()
+  });
+  if (error) { setObsState("送信エラー: " + error.message); return false; }
+  lastPublished = payload;
+  return true;
+}
+
+$("showBtn").addEventListener("click", async () => {
+  const payload = buildPayload();
+  if (!payload.items.length){ setObsState("「表示」にチェックが入っている回答者がいません"); return; }
+  if (await publish(payload))
+    setObsState(`OBSに ${payload.items.length}人 表示中 (${payload.items.map(i=>i.name).join("、")})`);
+});
+
+// ポイント一括反映: 表示中の内容にポイントを載せる(表示ONに)
+$("pointsBtn").addEventListener("click", async () => {
+  $("showPointsChk").checked = true;
+  let payload;
+  if (lastPublished && lastPublished.items.length){
+    // 表示中のメンバーはそのまま、ポイントだけ最新化
+    const items = lastPublished.items.map(it => {
+      const p = players.find(x => x.name === it.name);
+      return { ...it, points: p ? (p.points || 0) : it.points };
+    });
+    payload = { items, showPoints: true };
+  } else {
+    payload = buildPayload();
+    if (!payload.items.length){ setObsState("先に「OBSに表示」するか、表示にチェックを入れてください"); return; }
+  }
+  if (await publish(payload)) setObsState("ポイントを表示に反映しました");
+});
+
+$("hideBtn").addEventListener("click", async () => {
+  if (await publish({ items: [], showPoints: false })) setObsState("表示を消しました");
+});
+
+// ===== リセット: 全員の回答とチェックを消す(名前・ポイントは残す) =====
+$("resetBtn").addEventListener("click", async () => {
+  if (!confirm("全員の回答・チェック・OBS表示をリセットします。よろしいですか？\n(名前とポイントは残ります)")) return;
+  await sb.from("quiz_players").update({ answer: "" }).eq("room_code", room);
+  checks.forEach(c => { c.show = false; c.correct = false; });
+  players.forEach(p => p.answer = "");
+  await publish({ items: [], showPoints: false });
+  renderPlayers();
+  setObsState("リセットしました");
+});
+</script>
+</body>
+</html>

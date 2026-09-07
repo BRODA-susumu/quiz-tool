@@ -1,0 +1,218 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>クイズ回答表示 - OBS用</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@700;900&display=swap" rel="stylesheet">
+<style>
+  *{box-sizing:border-box;}
+  html,body{margin:0; padding:0; background:transparent; overflow:hidden;}
+  body{font-family:"Noto Sans JP",-apple-system,BlinkMacSystemFont,sans-serif;}
+
+  /* 1920x1080 固定ステージ(ブラウザで開いた時は縮小表示) */
+  #stage{
+    position:absolute; top:0; left:0; width:1920px; height:1080px;
+    transform-origin:top left;
+  }
+  #grid{
+    position:absolute; inset:0;
+    display:flex; flex-wrap:wrap; align-content:center; justify-content:center;
+  }
+
+  .card{
+    position:relative;
+    background:linear-gradient(160deg,#1e6ae8,#0b3fa0);
+    border:8px solid #fff; border-radius:22px;
+    box-shadow:0 12px 36px rgba(0,0,0,.5), inset 0 0 0 3px rgba(0,0,0,.18);
+    overflow:hidden;
+    opacity:0; transform:scale(.92);
+    animation:pop .35s cubic-bezier(.2,1.4,.4,1) forwards;
+  }
+  .card.correct{
+    background:linear-gradient(160deg,#f0343e,#a80c1c);
+  }
+  @keyframes pop{ to{opacity:1; transform:scale(1);} }
+
+  .answer{
+    position:absolute; left:0; right:0; top:0;
+    color:#fff; font-weight:900; line-height:1.25; text-align:center;
+    white-space:pre; word-break:keep-all;
+    text-shadow:0 4px 10px rgba(0,0,0,.4);
+    display:flex; align-items:center; justify-content:center;
+  }
+  .answer > div{width:100%; padding:0 4%;}
+
+  .nameBar{
+    position:absolute; left:0; right:0; bottom:0;
+    display:flex; align-items:center; justify-content:center; gap:.5em;
+    background:linear-gradient(180deg, rgba(0,0,0,0), rgba(0,0,0,.42));
+    color:#fff; font-weight:900; text-shadow:0 2px 6px rgba(0,0,0,.5);
+    letter-spacing:.05em;
+  }
+  .pts{
+    background:#ffe14d; color:#4a3800; border-radius:.5em;
+    padding:.08em .45em; font-weight:900;
+  }
+  /* 測定用 */
+  #measure{
+    position:absolute; visibility:hidden; pointer-events:none;
+    font-family:"Noto Sans JP",sans-serif; font-weight:900; line-height:1.25;
+    white-space:pre; word-break:keep-all; text-align:center;
+  }
+</style>
+</head>
+<body>
+<div id="stage"><div id="grid"></div></div>
+<div id="measure"></div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+<script>
+const SUPABASE_URL = "https://ooukcrjaihuggeiajsqw.supabase.co";
+const SUPABASE_KEY = "sb_publishable_Gd8q6yFNdS1CtUDQK5NH0Q_tZv6L2A6";
+const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+const STAGE_W = 1920, STAGE_H = 1080;
+const stage = document.getElementById("stage");
+const grid = document.getElementById("grid");
+const measure = document.getElementById("measure");
+
+// ブラウザで開いた時に画面に合わせて縮小
+function fitStage(){
+  const s = Math.min(window.innerWidth / STAGE_W, window.innerHeight / STAGE_H);
+  stage.style.transform = "scale(" + s + ")";
+}
+window.addEventListener("resize", () => { fitStage(); render(lastPayload); });
+fitStage();
+
+// ===== レイアウト計算: n枚の4:3カードを最大サイズで並べる =====
+function bestLayout(n){
+  const PAD = 40;                    // ステージ外周余白
+  const GAP = 28;                    // カード間
+  const availW = STAGE_W - PAD * 2, availH = STAGE_H - PAD * 2;
+  let best = { size: 0, cols: 1, rows: n };
+  for (let cols = 1; cols <= n; cols++){
+    const rows = Math.ceil(n / cols);
+    const cw = (availW - GAP * (cols - 1)) / cols;
+    const ch = (availH - GAP * (rows - 1)) / rows;
+    // 4:3 に収まる最大幅
+    const w = Math.min(cw, ch * 4 / 3);
+    if (w > best.size) best = { size: w, cols, rows };
+  }
+  return { w: best.size, h: best.size * 3 / 4, cols: best.cols, gap: GAP };
+}
+
+// ===== 最大9文字で折り返し（手動改行は尊重） =====
+const MAX_CHARS = 9;
+function wrap9(text){
+  return String(text || "").split("\n").map(line => {
+    const ch = Array.from(line);
+    if (ch.length <= MAX_CHARS) return line;
+    const out = [];
+    for (let i = 0; i < ch.length; i += MAX_CHARS) out.push(ch.slice(i, i + MAX_CHARS).join(""));
+    return out.join("\n");
+  }).join("\n");
+}
+
+// ===== 文字サイズ自動調整 =====
+function fitInto(el, text, w, h, maxFs){
+  measure.style.width = w + "px";
+  let lo = 8, hi = Math.floor(maxFs);
+  measure.textContent = text || " ";
+  while (lo < hi){
+    const mid = Math.ceil((lo + hi) / 2);
+    measure.style.fontSize = mid + "px";
+    if (measure.scrollHeight <= h && measure.scrollWidth <= w + 1) lo = mid; else hi = mid - 1;
+  }
+  el.style.fontSize = lo + "px";
+  return lo;
+}
+
+let lastPayload = { items: [], showPoints: false };
+
+function render(payload){
+  lastPayload = payload || { items: [] };
+  const items = lastPayload.items || [];
+  const showPoints = !!lastPayload.showPoints;
+  grid.innerHTML = "";
+  if (!items.length) return;
+
+  const L = bestLayout(items.length);
+  grid.style.gap = L.gap + "px";
+
+  items.forEach((it, i) => {
+    const card = document.createElement("div");
+    card.className = "card" + (it.correct ? " correct" : "");
+    card.style.width = L.w + "px";
+    card.style.height = L.h + "px";
+    card.style.animationDelay = (i * 0.06) + "s";
+
+    const nameH = Math.max(44, L.h * 0.16);
+    const nameFs = Math.round(nameH * 0.42);
+
+    const ans = document.createElement("div");
+    ans.className = "answer";
+    ans.style.bottom = nameH + "px";
+    const inner = document.createElement("div");
+    const wrapped = wrap9(it.answer);
+    inner.textContent = wrapped;
+    ans.appendChild(inner);
+
+    const bar = document.createElement("div");
+    bar.className = "nameBar";
+    bar.style.height = nameH + "px";
+    bar.style.fontSize = nameFs + "px";
+    if (showPoints){
+      const pts = document.createElement("span");
+      pts.className = "pts";
+      pts.style.fontSize = Math.round(nameFs * 0.8) + "px";
+      pts.textContent = (it.points ?? 0) + "pt";
+      bar.appendChild(pts);
+    }
+    const nm = document.createElement("span");
+    nm.textContent = it.name || "";
+    bar.appendChild(nm);
+
+    card.appendChild(ans);
+    card.appendChild(bar);
+    grid.appendChild(card);
+
+    // 回答文字サイズ調整
+    const aw = (L.w - 16 * 2) * 0.92, ah = (L.h - nameH) * 0.86;
+    fitInto(inner, wrapped, aw, ah, ah * 0.9);
+  });
+}
+window.renderPayload = render; // テスト用フック
+
+// ===== Supabase 接続 =====
+const params = new URLSearchParams(location.search);
+const room = (params.get("room") || "").trim();
+
+async function start(){
+  if (!room){
+    grid.innerHTML = "";
+    render({ items: [{ name: "エラー", answer: "URLに ?room=ルームコード を付けてください", correct: false }], showPoints: false });
+    return;
+  }
+  // 初期状態を取得
+  const { data } = await sb.from("quiz_display").select("payload").eq("room_code", room).maybeSingle();
+  if (data && data.payload) render(data.payload);
+
+  // 更新を購読
+  sb.channel("display-" + room)
+    .on("postgres_changes",
+      { event: "*", schema: "public", table: "quiz_display", filter: "room_code=eq." + room },
+      p => { if (p.new && p.new.payload) render(p.new.payload); })
+    .subscribe();
+
+  // 保険: 15秒ごとにポーリング(Realtime切断対策)
+  setInterval(async () => {
+    const { data } = await sb.from("quiz_display").select("payload").eq("room_code", room).maybeSingle();
+    if (data && data.payload && JSON.stringify(data.payload) !== JSON.stringify(lastPayload)) render(data.payload);
+  }, 15000);
+}
+start();
+</script>
+</body>
+</html>

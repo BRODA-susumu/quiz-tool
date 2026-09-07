@@ -1,0 +1,242 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+<title>クイズ回答 - 回答者用</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@500;700;900&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --blue1:#1e6ae8; --blue2:#0b3fa0;
+    --bg:#0e1524; --panel:#1a2338; --line:#2c3a5c; --text:#f2f5fb; --sub:#93a3c4;
+  }
+  *{box-sizing:border-box; -webkit-tap-highlight-color:transparent;}
+  body{
+    margin:0; min-height:100dvh; background:var(--bg); color:var(--text);
+    font-family:"Noto Sans JP",-apple-system,BlinkMacSystemFont,sans-serif;
+    display:flex; flex-direction:column; align-items:center; padding:14px;
+  }
+  .wrap{width:100%; max-width:640px; display:flex; flex-direction:column; gap:12px;}
+  h1{font-size:16px; font-weight:900; margin:2px 0 0; letter-spacing:.08em; color:var(--sub); text-align:center;}
+  .row{display:flex; gap:8px;}
+  input[type=text]{
+    flex:1; min-width:0; background:var(--panel); border:2px solid var(--line); border-radius:10px;
+    color:var(--text); font-size:16px; font-weight:700; padding:12px 14px; outline:none;
+    font-family:inherit;
+  }
+  input[type=text]:focus{border-color:var(--blue1);}
+  input::placeholder{color:#5f6f92; font-weight:500;}
+  button{
+    border:none; border-radius:10px; font-family:inherit; font-weight:900; font-size:15px;
+    padding:12px 18px; cursor:pointer; color:#fff; background:linear-gradient(180deg,var(--blue1),var(--blue2));
+  }
+  button:active{transform:translateY(1px);}
+  button:disabled{opacity:.45; cursor:default;}
+  .status{font-size:12px; font-weight:700; color:var(--sub); text-align:center; min-height:16px;}
+  .status.on{color:#39d98a;}
+  .status.err{color:#ff6b6b;}
+
+  /* ===== 4:3 回答枠 ===== */
+  .boardWrap{width:100%;}
+  .board{
+    position:relative; width:100%; aspect-ratio:4/3;
+    background:linear-gradient(160deg,var(--blue1),var(--blue2));
+    border:6px solid #fff; border-radius:16px;
+    box-shadow:0 10px 30px rgba(0,0,0,.45), inset 0 0 0 2px rgba(0,0,0,.18);
+    overflow:hidden;
+  }
+  .board textarea{
+    position:absolute; inset:0; width:100%; height:100%;
+    background:transparent; border:none; outline:none; resize:none;
+    color:transparent; font-family:inherit; font-weight:900; line-height:1.25;
+    text-align:center; padding:16px;
+    overflow-wrap:anywhere; word-break:break-all; white-space:pre-wrap;
+    caret-color:#ffe14d;
+    display:block; z-index:2;
+  }
+  /* プレビュー(実際に表示される見た目・最大9文字で折り返し) */
+  .board .preview{
+    position:absolute; inset:0; padding:16px; z-index:1;
+    color:#fff; font-family:inherit; font-weight:900; line-height:1.25;
+    text-align:center; white-space:pre; word-break:keep-all;
+    text-shadow:0 3px 8px rgba(0,0,0,.35); pointer-events:none; overflow:hidden;
+  }
+  .board .preview.ph{color:rgba(255,255,255,.45);}
+  .hint{font-size:11px; color:var(--sub); text-align:center;}
+  .savebar{display:flex; align-items:center; justify-content:center; gap:10px;}
+  .clearBtn{background:linear-gradient(180deg,#4a5878,#323d58); font-size:13px; padding:10px 14px;}
+  /* 縦中央寄せ用の測定 */
+  .measure{
+    position:absolute; visibility:hidden; pointer-events:none;
+    font-family:"Noto Sans JP",sans-serif; font-weight:900; line-height:1.25;
+    white-space:pre; word-break:keep-all; text-align:center;
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>QUIZ ANSWER — 回答者用</h1>
+
+  <div class="row">
+    <input type="text" id="roomInput" placeholder="ルームコード" maxlength="32" autocomplete="off">
+    <input type="text" id="nameInput" placeholder="なまえ" maxlength="30" autocomplete="off">
+    <button id="joinBtn">参加</button>
+  </div>
+  <div class="status" id="status">ルームコードと名前を入れて「参加」を押してください</div>
+
+  <div class="boardWrap">
+    <div class="board">
+      <div class="preview" id="preview"></div>
+      <textarea id="answerInput" disabled></textarea>
+    </div>
+  </div>
+  <div class="savebar">
+    <button class="clearBtn" id="clearBtn" disabled>回答をクリア</button>
+  </div>
+  <div class="hint">入力すると自動で送信されます。改行は自由、1行が9文字を超えると自動で折り返されます。</div>
+</div>
+<div class="measure" id="measure"></div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+<script>
+const SUPABASE_URL = "https://ooukcrjaihuggeiajsqw.supabase.co";
+const SUPABASE_KEY = "sb_publishable_Gd8q6yFNdS1CtUDQK5NH0Q_tZv6L2A6";
+const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+const $ = id => document.getElementById(id);
+const roomInput = $("roomInput"), nameInput = $("nameInput"), joinBtn = $("joinBtn");
+const answerInput = $("answerInput"), statusEl = $("status"), clearBtn = $("clearBtn"), measure = $("measure"), preview = $("preview");
+const PLACEHOLDER = "ここに回答を入力";
+
+// ===== 最大9文字で折り返し（手動改行は尊重） =====
+const MAX_CHARS = 9;
+function wrap9(text){
+  return String(text || "").split("\n").map(line => {
+    const ch = Array.from(line);
+    if (ch.length <= MAX_CHARS) return line;
+    const out = [];
+    for (let i = 0; i < ch.length; i += MAX_CHARS) out.push(ch.slice(i, i + MAX_CHARS).join(""));
+    return out.join("\n");
+  }).join("\n");
+}
+
+let playerId = null, room = "", myName = "", channel = null, saveTimer = null, applyingRemote = false;
+
+// URLパラメータ ?room=xxx を反映
+const params = new URLSearchParams(location.search);
+if (params.get("room")) roomInput.value = params.get("room").trim();
+try { if (localStorage.getItem("quiz_name")) nameInput.value = localStorage.getItem("quiz_name"); } catch(e){}
+
+function setStatus(msg, cls){ statusEl.textContent = msg; statusEl.className = "status " + (cls||""); }
+
+// ===== 文字サイズ自動調整(なるべく大きく) + プレビュー描画 =====
+function fitText(){
+  const box = answerInput;
+  const w = box.clientWidth - 32, h = box.clientHeight - 32; // padding分
+  if (w <= 0 || h <= 0) return;
+  const raw = box.value;
+  const isPh = raw.length === 0;
+  const wrapped = wrap9(isPh ? PLACEHOLDER : raw);
+  preview.textContent = wrapped;
+  preview.classList.toggle("ph", isPh);
+
+  let lo = 10, hi = Math.floor(h * 0.9);
+  while (lo < hi) {
+    const mid = Math.ceil((lo + hi) / 2);
+    measure.style.fontSize = mid + "px";
+    measure.textContent = wrapped;
+    if (measure.scrollHeight <= h && measure.scrollWidth <= w + 1) lo = mid; else hi = mid - 1;
+  }
+  // プレビューと入力欄に同じフォントサイズ
+  preview.style.fontSize = lo + "px";
+  box.style.fontSize = lo + "px";
+  // 縦中央寄せ: 上パディングで揃える
+  measure.style.fontSize = lo + "px";
+  measure.textContent = wrapped;
+  const pad = Math.max(16, (box.clientHeight - measure.scrollHeight) / 2);
+  preview.style.paddingTop = pad + "px";
+  box.style.paddingTop = pad + "px";
+}
+window.addEventListener("resize", fitText);
+
+// ===== 参加 =====
+joinBtn.addEventListener("click", join);
+nameInput.addEventListener("keydown", e => { if (e.key === "Enter") join(); });
+
+async function join(){
+  const r = roomInput.value.trim(), n = nameInput.value.trim();
+  if (!r || !n) { setStatus("ルームコードと名前を入力してください", "err"); return; }
+  joinBtn.disabled = true;
+  setStatus("接続中…");
+  try {
+    const { data, error } = await sb.from("quiz_players")
+      .upsert({ room_code: r, name: n }, { onConflict: "room_code,name" })
+      .select().single();
+    if (error) throw error;
+    playerId = data.id; room = r; myName = n;
+    try { localStorage.setItem("quiz_name", n); } catch(e){}
+    applyingRemote = true;
+    answerInput.value = data.answer || "";
+    applyingRemote = false;
+    answerInput.disabled = false; clearBtn.disabled = false;
+    roomInput.disabled = true; nameInput.disabled = true;
+    joinBtn.textContent = "参加中";
+    setStatus(`「${r}」に ${n} として参加中`, "on");
+    fitText();
+    answerInput.focus();
+    subscribe();
+  } catch (err) {
+    console.error(err);
+    setStatus("接続に失敗しました: " + (err.message || err), "err");
+    joinBtn.disabled = false;
+  }
+}
+
+// 管理者のリセットを受け取る
+function subscribe(){
+  if (channel) sb.removeChannel(channel);
+  channel = sb.channel("player-" + playerId)
+    .on("postgres_changes",
+      { event: "UPDATE", schema: "public", table: "quiz_players", filter: "id=eq." + playerId },
+      payload => {
+        const remote = payload.new.answer ?? "";
+        if (remote !== answerInput.value && document.activeElement !== answerInput || remote === "") {
+          applyingRemote = true;
+          if (remote !== answerInput.value) { answerInput.value = remote; fitText(); }
+          applyingRemote = false;
+        }
+      })
+    .subscribe();
+}
+
+// ===== 入力 → 自動保存(デバウンス) =====
+answerInput.addEventListener("input", () => {
+  fitText();
+  if (applyingRemote || !playerId) return;
+  clearTimeout(saveTimer);
+  saveTimer = setTimeout(saveAnswer, 300);
+});
+
+async function saveAnswer(){
+  if (!playerId) return;
+  const text = answerInput.value.slice(0, 1000);
+  const { error } = await sb.from("quiz_players")
+    .update({ answer: text, updated_at: new Date().toISOString() })
+    .eq("id", playerId);
+  if (error) { setStatus("送信エラー: " + error.message, "err"); }
+  else { setStatus(`「${room}」に ${myName} として参加中 ✓送信済み`, "on"); }
+}
+
+clearBtn.addEventListener("click", () => {
+  answerInput.value = "";
+  fitText();
+  clearTimeout(saveTimer);
+  saveAnswer();
+  answerInput.focus();
+});
+
+fitText();
+</script>
+</body>
+</html>
