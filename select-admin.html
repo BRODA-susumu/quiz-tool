@@ -121,6 +121,7 @@
     <div class="qrow">
       <select id="savedSelect"><option value="">― 保存した問題を選ぶ ―</option></select>
       <button id="deleteSavedBtn">選択を削除</button>
+      <button class="danger" id="deleteAllSavedBtn">全て削除</button>
     </div>
   </div>
 
@@ -434,6 +435,12 @@ $("deleteSavedBtn").addEventListener("click", ()=>{
   const arr=getSaved(); const idx=parseInt(v,10);
   if(idx>=0&&idx<arr.length){ if(!confirm(`保存した問題を削除しますか？\n「${(arr[idx].question||"").slice(0,36)}」`)) return;
     arr.splice(idx,1); setSaved(arr); loadSaved(); setObs("保存した問題を削除しました"); }
+});
+$("deleteAllSavedBtn").addEventListener("click", ()=>{
+  const arr=getSaved();
+  if(!arr.length){ setObs("保存した問題はありません"); return; }
+  if(!confirm(`保存した問題を全て削除しますか？（${arr.length}件）\nこの操作は取り消せません。`)) return;
+  setSaved([]); loadSaved(); setObs("保存した問題を全て削除しました");
 });
 </script>
 </body>

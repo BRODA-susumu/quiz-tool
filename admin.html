@@ -128,6 +128,7 @@
     <div class="qrow">
       <select id="qSelect"><option value="">― 保存した問題を選ぶ ―</option></select>
       <button id="qDeleteBtn">選択を削除</button>
+      <button class="danger" id="qDeleteAllBtn">全て削除</button>
     </div>
   </div>
 
@@ -492,6 +493,12 @@ $("qDeleteBtn").addEventListener("click", () => {
     if (!confirm(`保存した問題を削除しますか？\n「${arr[idx].slice(0,40)}」`)) return;
     arr.splice(idx, 1); setSaved(arr); loadSavedQuestions(); setObsState("保存した問題を削除しました");
   }
+});
+$("qDeleteAllBtn").addEventListener("click", () => {
+  const arr = getSaved();
+  if (!arr.length){ setObsState("保存した問題はありません"); return; }
+  if (!confirm(`保存した問題を全て削除しますか？（${arr.length}件）\nこの操作は取り消せません。`)) return;
+  setSaved([]); loadSavedQuestions(); setObsState("保存した問題を全て削除しました");
 });
 </script>
 </body>
