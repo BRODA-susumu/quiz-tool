@@ -189,6 +189,12 @@ let display = { items: [], showPoints: false, contentMode: "answer", question: "
 function setStatus(msg, cls){ $("status").textContent = msg; $("status").className = "status " + (cls||""); }
 function setObsState(msg){ $("obsState").textContent = msg; }
 
+// ===== 更新しても復帰するための永続化 =====
+const ROOM_KEY = "quiz_admin_room";
+function checksKey(){ return "quiz_admin_checks_" + room; }
+function saveChecks(){ try { const o={}; checks.forEach((v,k)=>o[k]=v); localStorage.setItem(checksKey(), JSON.stringify(o)); } catch(e){} }
+function loadChecks(){ try { const o=JSON.parse(localStorage.getItem(checksKey())||"{}"); for(const id in o){ checks.set(id, o[id]); } } catch(e){} }
+
 // ===== 入室 =====
 const params = new URLSearchParams(location.search);
 if (params.get("room")) $("roomInput").value = params.get("room").trim();
@@ -200,6 +206,7 @@ async function join(){
   const r = $("roomInput").value.trim();
   if (!r){ setStatus("ルームコードを入力してください", "err"); return; }
   room = r;
+  try { localStorage.setItem(ROOM_KEY, room); } catch(e){}
   $("joinBtn").disabled = true; $("roomInput").disabled = true;
   $("joinBtn").textContent = "入室中";
   setStatus("接続中…");
@@ -217,6 +224,8 @@ async function join(){
 
   try {
     await reload();
+    loadChecks();
+    renderPlayers();
     const { data } = await sb.from("quiz_display").select("payload").eq("room_code", room).maybeSingle();
     if (data && data.payload){
       display = Object.assign({ items: [], showPoints:false, contentMode:"answer", question:"", font:"gothic", mode:"answers", results:[], resultsPage:0 }, data.payload);
@@ -310,9 +319,9 @@ function renderPlayers(){
     const ans = document.createElement("div"); ans.className = "ans"; ans.textContent = p.answer || "";
     na.append(name, ans);
 
-    const showL = mkCheck("表示", "show", c.show, v => { c.show = v; });
+    const showL = mkCheck("表示", "show", c.show, v => { c.show = v; saveChecks(); });
     const okL   = mkCheck("正解", "correct", c.correct, async v => {
-      c.correct = v;
+      c.correct = v; saveChecks();
       if (v && $("autoAwardChk").checked) await changePoints(p, +1);  // 自動+1(外しても減らさない)
     });
 
@@ -350,10 +359,10 @@ async function changePoints(p, delta){
 // ===== 一括チェック =====
 $("checkAllBtn").addEventListener("click", () => {
   players.forEach(p => { if (!checks.has(p.id)) checks.set(p.id, {show:false,correct:false}); checks.get(p.id).show = true; });
-  renderPlayers();
+  saveChecks(); renderPlayers();
 });
-$("uncheckAllBtn").addEventListener("click", () => { checks.forEach(c => c.show = false); renderPlayers(); });
-$("uncheckCorrectBtn").addEventListener("click", () => { checks.forEach(c => c.correct = false); renderPlayers(); });
+$("uncheckAllBtn").addEventListener("click", () => { checks.forEach(c => c.show = false); saveChecks(); renderPlayers(); });
+$("uncheckCorrectBtn").addEventListener("click", () => { checks.forEach(c => c.correct = false); saveChecks(); renderPlayers(); });
 
 // ===== OBSフォント =====
 $("fontSelect").addEventListener("change", async () => {
@@ -441,7 +450,7 @@ $("hideBtn").addEventListener("click", async () => {
 $("resetBtn").addEventListener("click", async () => {
   if (!confirm("全員の回答・チェックとOBSの回答表示をリセットします。よろしいですか？\n(名前・ポイント・問題文は残ります)")) return;
   await sb.from("quiz_players").update({ answer: "" }).eq("room_code", room);
-  checks.forEach(c => { c.show = false; c.correct = false; });
+  checks.forEach(c => { c.show = false; c.correct = false; }); saveChecks();
   players.forEach(p => p.answer = "");
   display.items = []; display.contentMode = "answer"; display.mode = "answers";
   await publish(); renderPlayers(); updateResultBtns();
@@ -500,6 +509,13 @@ $("qDeleteAllBtn").addEventListener("click", () => {
   if (!confirm(`保存した問題を全て削除しますか？（${arr.length}件）\nこの操作は取り消せません。`)) return;
   setSaved([]); loadSavedQuestions(); setObsState("保存した問題を全て削除しました");
 });
+
+// ===== 前回の部屋に自動で復帰(ページ更新対策) =====
+(function autoRejoin(){
+  let saved = null; try { saved = localStorage.getItem(ROOM_KEY); } catch(e){}
+  const r = (params.get("room") || saved || "").trim();
+  if (r){ $("roomInput").value = r; join(); }
+})();
 </script>
 </body>
 </html>

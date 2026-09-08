@@ -221,11 +221,24 @@ function readOptions(){
 }
 $("addOptBtn").addEventListener("click", ()=>addOptRow(""));
 
+// ===== 更新しても復帰するための永続化 =====
+const ROOM_KEY="quiz_select_admin_room";
+function stateKey(){ return "quiz_select_admin_state_"+room; }
+function saveState(){ try{ localStorage.setItem(stateKey(), JSON.stringify({ qid:disp.qid, correct:currentCorrect, awarded:[...awarded] })); }catch(e){} }
+function loadState(){
+  try{
+    const s=JSON.parse(localStorage.getItem(stateKey())||"{}");
+    if(s.awarded) s.awarded.forEach(q=>awarded.add(q));
+    if(s.qid && s.qid===disp.qid && typeof s.correct==="number") currentCorrect=s.correct;
+  }catch(e){}
+}
+
 // ===== 入室 =====
 async function join(){
   const r=$("roomInput").value.trim();
   if(!r){ setStatus("ルームコードを入力してください","err"); return; }
-  room=r; $("joinBtn").disabled=true; $("roomInput").disabled=true; $("joinBtn").textContent="入室中"; setStatus("接続中…");
+  room=r; try{ localStorage.setItem(ROOM_KEY, room); }catch(e){}
+  $("joinBtn").disabled=true; $("roomInput").disabled=true; $("joinBtn").textContent="入室中"; setStatus("接続中…");
   const base=location.href.replace(/[^/]*$/, "");
   $("answerUrl").textContent=base+"select-answer.html?room="+encodeURIComponent(room);
   $("displayUrl").textContent=base+"select-display.html?room="+encodeURIComponent(room);
@@ -237,6 +250,9 @@ async function join(){
     await reload();
     const { data } = await sb.from("quiz_select_display").select("payload").eq("room_code",room).maybeSingle();
     if(data&&data.payload){ disp=Object.assign(disp, data.payload); $("fontSelect").value=disp.font||"gothic"; syncModeSeg(); $("countsChk").checked=!!disp.showCounts; updateResultBtns(); }
+    loadState();                 // 出題中の正解情報・加算済み状態を復元
+    if(disp.revealed && disp.correctIndex!=null) currentCorrect=disp.correctIndex;  // 発表済みならpayloadからも復元
+    renderTally();
     subscribe();
     setStatus(`ルーム「${room}」に接続中`,"on");
   }catch(err){ setStatus("接続エラー: "+(err.message||err),"err"); $("joinBtn").disabled=false; $("roomInput").disabled=false; }
@@ -288,6 +304,7 @@ $("publishBtn").addEventListener("click", async()=>{
   disp.showCounts=false; disp.mode="quiz"; disp.resultsPage=0; disp.results=[];
   disp.font=$("fontSelect").value;
   $("countsChk").checked=false; syncModeSeg();
+  saveState();
   if(await publishDisp()){ setObs(`出題しました（${clean.length}択）`); updateResultBtns(); }
 });
 
@@ -314,7 +331,7 @@ $("revealBtn").addEventListener("click", async()=>{
   if(await publishDisp()){
     // 正解者に+1（qidごとに一度だけ）
     if(!awarded.has(disp.qid)){
-      awarded.add(disp.qid);
+      awarded.add(disp.qid); saveState();
       const winners=players.filter(p=>p.qid===disp.qid && p.choice===currentCorrect);
       for(const p of winners){ p.points=(p.points||0)+1; await sb.from("quiz_select_players").update({points:p.points}).eq("id",p.id); }
       renderPlayers();
@@ -442,6 +459,13 @@ $("deleteAllSavedBtn").addEventListener("click", ()=>{
   if(!confirm(`保存した問題を全て削除しますか？（${arr.length}件）\nこの操作は取り消せません。`)) return;
   setSaved([]); loadSaved(); setObs("保存した問題を全て削除しました");
 });
+
+// ===== 前回の部屋に自動で復帰(ページ更新対策) =====
+(function autoRejoin(){
+  let saved=null; try{ saved=localStorage.getItem(ROOM_KEY); }catch(e){}
+  const r=(params.get("room")||saved||"").trim();
+  if(r){ $("roomInput").value=r; join(); }
+})();
 </script>
 </body>
 </html>
