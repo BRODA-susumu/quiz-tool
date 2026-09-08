@@ -1,0 +1,191 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+<title>クイズ回答(選択式) - 回答者用</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@500;700;900&display=swap" rel="stylesheet">
+<style>
+  :root{ --blue1:#1e6ae8; --blue2:#0b3fa0; --red1:#f0343e; --green:#1ba85a;
+    --bg:#0e1524; --panel:#1a2338; --line:#2c3a5c; --text:#f2f5fb; --sub:#93a3c4; }
+  *{box-sizing:border-box; -webkit-tap-highlight-color:transparent;}
+  [hidden]{display:none!important;}
+  body{margin:0; min-height:100dvh; background:var(--bg); color:var(--text);
+    font-family:"Noto Sans JP",-apple-system,BlinkMacSystemFont,sans-serif;
+    display:flex; flex-direction:column; align-items:center; padding:14px;}
+  .wrap{width:100%; max-width:640px; display:flex; flex-direction:column; gap:12px;}
+  h1{font-size:16px; font-weight:900; margin:2px 0 0; letter-spacing:.08em; color:var(--sub); text-align:center;}
+  .row{display:flex; gap:8px;}
+  input[type=text]{flex:1; min-width:0; background:var(--panel); border:2px solid var(--line); border-radius:10px;
+    color:var(--text); font-size:16px; font-weight:700; padding:12px 14px; outline:none; font-family:inherit;}
+  input[type=text]:focus{border-color:var(--blue1);}
+  input::placeholder{color:#5f6f92; font-weight:500;}
+  button{border:none; border-radius:10px; font-family:inherit; font-weight:900; font-size:15px;
+    padding:12px 18px; cursor:pointer; color:#fff; background:linear-gradient(180deg,var(--blue1),var(--blue2));}
+  button:active{transform:translateY(1px);}
+  button:disabled{opacity:.5; cursor:default;}
+  .status{font-size:12px; font-weight:700; color:var(--sub); text-align:center; min-height:16px;}
+  .status.on{color:#39d98a;} .status.err{color:#ff6b6b;}
+
+  .qbanner{background:#fff; color:#0b2a5b; border-radius:12px; padding:14px 16px; font-weight:900;
+    font-size:20px; line-height:1.35; text-align:center; white-space:pre-wrap; overflow-wrap:anywhere; word-break:break-word;
+    box-shadow:0 4px 14px rgba(0,0,0,.3);}
+  .qbanner .qlabel{display:block; font-size:11px; color:#5f6f92; font-weight:700; margin-bottom:2px; letter-spacing:.1em;}
+
+  .waiting{background:var(--panel); border:2px dashed var(--line); border-radius:14px; padding:40px 16px;
+    text-align:center; color:var(--sub); font-weight:700;}
+
+  .options{display:flex; flex-direction:column; gap:12px;}
+  .opt{
+    display:flex; align-items:center; gap:14px; width:100%; text-align:left;
+    background:linear-gradient(180deg,#243357,#1a2740); border:3px solid var(--line); border-radius:16px;
+    color:var(--text); font-size:22px; font-weight:900; padding:18px 18px; cursor:pointer; line-height:1.3;
+    white-space:pre-wrap; overflow-wrap:anywhere; word-break:break-word;
+  }
+  .opt .mark{flex:0 0 auto; width:42px; height:42px; border-radius:50%; background:var(--blue1); color:#fff;
+    display:flex; align-items:center; justify-content:center; font-size:22px; font-weight:900;}
+  .opt:active{transform:translateY(1px);}
+  .opt.chosen{border-color:#ffe14d; background:linear-gradient(180deg,#2d3f6b,#213255); box-shadow:0 0 0 3px rgba(255,225,77,.35) inset;}
+  .opt.locked{cursor:default; opacity:.96;}
+  .opt.correct{border-color:var(--green); background:linear-gradient(180deg,#1e6b45,#0f4a2e);}
+  .opt.correct .mark{background:var(--green);}
+  .opt.wrongpick{border-color:var(--red1); background:linear-gradient(180deg,#6b2530,#4a141c);}
+  .opt.wrongpick .mark{background:var(--red1);}
+  .hint{font-size:11px; color:var(--sub); text-align:center;}
+  .resultmsg{text-align:center; font-weight:900; font-size:18px; padding:8px;}
+  .resultmsg.ok{color:#39d98a;} .resultmsg.ng{color:#ff8a8a;}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>QUIZ（選択式）— 回答者用</h1>
+  <div class="row">
+    <input type="text" id="roomInput" placeholder="ルームコード" maxlength="32" autocomplete="off">
+    <input type="text" id="nameInput" placeholder="なまえ" maxlength="30" autocomplete="off">
+    <button id="joinBtn">参加</button>
+  </div>
+  <div class="status" id="status">ルームコードと名前を入れて「参加」を押してください</div>
+
+  <div class="qbanner" id="qbanner" hidden><span class="qlabel">問題</span><span id="qtext"></span></div>
+  <div class="resultmsg" id="resultmsg" hidden></div>
+  <div class="options" id="options"></div>
+  <div class="waiting" id="waiting" hidden>出題を待っています…</div>
+  <div class="hint" id="hint" hidden>回答したい選択肢をタップしてください（選び直しはできません）</div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+<script>
+const SUPABASE_URL = "https://ooukcrjaihuggeiajsqw.supabase.co";
+const SUPABASE_KEY = "sb_publishable_Gd8q6yFNdS1CtUDQK5NH0Q_tZv6L2A6";
+const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+const $ = id => document.getElementById(id);
+const roomInput=$("roomInput"), nameInput=$("nameInput"), joinBtn=$("joinBtn"), statusEl=$("status");
+const qbanner=$("qbanner"), qtext=$("qtext"), optionsEl=$("options"), waiting=$("waiting"), hint=$("hint"), resultmsg=$("resultmsg");
+
+let playerId=null, room="", myName="", curQid="", myChoice=-1, cur=null;
+
+const params=new URLSearchParams(location.search);
+if(params.get("room")) roomInput.value=params.get("room").trim();
+try{ if(localStorage.getItem("quiz_name")) nameInput.value=localStorage.getItem("quiz_name"); }catch(e){}
+
+function setStatus(m,c){ statusEl.textContent=m; statusEl.className="status "+(c||""); }
+const LETTERS="ABCDEFGHI";
+
+joinBtn.addEventListener("click", join);
+nameInput.addEventListener("keydown", e=>{ if(e.key==="Enter") join(); });
+
+async function join(){
+  const r=roomInput.value.trim(), n=nameInput.value.trim();
+  if(!r||!n){ setStatus("ルームコードと名前を入力してください","err"); return; }
+  joinBtn.disabled=true; setStatus("接続中…");
+  try{
+    const { data, error } = await sb.from("quiz_select_players")
+      .upsert({ room_code:r, name:n }, { onConflict:"room_code,name" }).select().single();
+    if(error) throw error;
+    playerId=data.id; room=r; myName=n;
+    try{ localStorage.setItem("quiz_name",n); }catch(e){}
+    roomInput.disabled=true; nameInput.disabled=true; joinBtn.textContent="参加中";
+    setStatus(`「${r}」に ${n} として参加中`,"on");
+    await loadCurrent(); watch();
+  }catch(err){ setStatus("接続に失敗しました: "+(err.message||err),"err"); joinBtn.disabled=false; }
+}
+
+async function loadCurrent(){
+  const { data } = await sb.from("quiz_select_display").select("payload").eq("room_code",room).maybeSingle();
+  applyDisplay(data && data.payload);
+}
+function watch(){
+  sb.channel("sel-ans-"+room)
+    .on("postgres_changes",{event:"*",schema:"public",table:"quiz_select_display",filter:"room_code=eq."+room},
+      p=>{ if(p.new&&p.new.payload) applyDisplay(p.new.payload); })
+    .subscribe();
+  setInterval(loadCurrent, 20000);
+}
+
+function applyDisplay(p){
+  cur=p||{};
+  const q=(cur.question||"").trim();
+  const opts=cur.options||[];
+  const qid=cur.qid||"";
+  const active = cur.mode!=="results" && qid && opts.length>0;
+
+  if(!active){
+    qbanner.hidden=true; optionsEl.innerHTML=""; hint.hidden=true; resultmsg.hidden=true;
+    waiting.hidden=false;
+    waiting.textContent = cur.mode==="results" ? "結果発表中です" : "出題を待っています…";
+    return;
+  }
+  waiting.hidden=true;
+  qbanner.hidden=false; qtext.textContent=q;
+
+  // 新しい問題になったら選択状態をリセット
+  if(qid!==curQid){ curQid=qid; myChoice=-1; }
+
+  renderOptions();
+}
+
+function renderOptions(){
+  const opts=cur.options||[];
+  const revealed=!!cur.revealed;
+  const correct = (cur.correctIndex==null)?-1:cur.correctIndex;
+  const locked = myChoice>=0 || revealed;
+  optionsEl.innerHTML="";
+  opts.forEach((text,i)=>{
+    const b=document.createElement("button");
+    b.className="opt"+(myChoice===i?" chosen":"")+(locked?" locked":"");
+    if(revealed){
+      if(i===correct) b.classList.add("correct");
+      else if(myChoice===i) b.classList.add("wrongpick");
+    }
+    const mk=document.createElement("span"); mk.className="mark"; mk.textContent=LETTERS[i]||(i+1);
+    const tx=document.createElement("span"); tx.textContent=text;
+    b.append(mk,tx);
+    if(!locked) b.addEventListener("click", ()=>choose(i));
+    optionsEl.appendChild(b);
+  });
+  hint.hidden = locked;
+  // 正解発表時の自分の結果
+  if(revealed && myChoice>=0){
+    resultmsg.hidden=false;
+    if(myChoice===correct){ resultmsg.textContent="正解！ 🎉"; resultmsg.className="resultmsg ok"; }
+    else{ resultmsg.textContent="残念…"; resultmsg.className="resultmsg ng"; }
+  } else if(!revealed && myChoice>=0){
+    resultmsg.hidden=false; resultmsg.textContent="回答を送信しました"; resultmsg.className="resultmsg ok";
+  } else {
+    resultmsg.hidden=true;
+  }
+}
+
+async function choose(i){
+  if(myChoice>=0 || cur.revealed) return;   // 選び直し不可
+  myChoice=i;
+  renderOptions();
+  const { error } = await sb.from("quiz_select_players")
+    .update({ choice:i, qid:curQid, updated_at:new Date().toISOString() }).eq("id",playerId);
+  if(error){ setStatus("送信エラー: "+error.message,"err"); }
+}
+</script>
+</body>
+</html>

@@ -1,0 +1,239 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>クイズ回答表示(選択式) - OBS用</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@700;900&family=Noto+Serif+JP:wght@700;900&family=M+PLUS+Rounded+1c:wght@700;800&family=Reggae+One&family=Dela+Gothic+One&family=Yusei+Magic&display=swap" rel="stylesheet">
+<style>
+  *{box-sizing:border-box;}
+  [hidden]{display:none!important;}
+  html,body{margin:0; padding:0; background:transparent; overflow:hidden;}
+  body{font-family:"Noto Sans JP",-apple-system,BlinkMacSystemFont,sans-serif;}
+  #stage{position:absolute; top:0; left:0; width:1920px; height:1080px; transform-origin:top left;}
+
+  /* 問題バー(上部・常時) */
+  #qbar{position:absolute; left:40px; right:40px; top:34px;
+    background:#fff; border-radius:20px; box-shadow:0 8px 24px rgba(0,0,0,.35);
+    display:flex; align-items:center; justify-content:center; padding:18px 46px;
+    color:#0b2a5b; font-weight:900; text-align:center; white-space:pre-wrap; overflow-wrap:anywhere; word-break:break-word; line-height:1.2;}
+
+  /* 選択肢タイル(quizモード) */
+  #qgrid{position:absolute; left:60px; right:60px; display:flex; flex-wrap:wrap; align-content:center; justify-content:center; gap:26px;}
+  .tile{
+    position:relative; background:linear-gradient(160deg,#1e6ae8,#0b3fa0);
+    border:7px solid #fff; border-radius:20px; box-shadow:0 12px 30px rgba(0,0,0,.45);
+    display:flex; align-items:center; gap:.5em; padding:0 40px; color:#fff; font-weight:900;
+    overflow:hidden; opacity:0; transform:scale(.94); animation:pop .3s cubic-bezier(.2,1.4,.4,1) forwards;
+  }
+  @keyframes pop{ to{opacity:1; transform:scale(1);} }
+  .tile .mk{flex:0 0 auto; display:flex; align-items:center; justify-content:center;
+    background:rgba(255,255,255,.22); border-radius:50%; font-weight:900;}
+  .tile .tx{flex:1; text-align:center; line-height:1.2; white-space:pre-wrap; overflow-wrap:anywhere; word-break:break-word; text-shadow:0 3px 8px rgba(0,0,0,.4);}
+  .tile .cnt{flex:0 0 auto; background:#ffe14d; color:#1a1a1a; border-radius:.4em; padding:.05em .35em; font-weight:900;}
+  .tile.correct{background:linear-gradient(160deg,#1ba85a,#0c7a3e);}
+  .tile.dim{filter:brightness(.5) grayscale(.35);}
+
+  /* 個人カード(cardsモード) */
+  #grid{position:absolute; left:0; right:0; display:flex; flex-wrap:wrap; align-content:center; justify-content:center;}
+  .card{position:relative; background:linear-gradient(160deg,#1e6ae8,#0b3fa0);
+    border:8px solid #fff; border-radius:22px; box-shadow:0 12px 36px rgba(0,0,0,.5), inset 0 0 0 3px rgba(0,0,0,.18);
+    overflow:hidden; opacity:0; transform:scale(.92); animation:pop .35s cubic-bezier(.2,1.4,.4,1) forwards;}
+  .card.correct{background:linear-gradient(160deg,#f0343e,#a80c1c);}
+  .card.none{background:linear-gradient(160deg,#3a4straight,#2a3652); background:linear-gradient(160deg,#455072,#2a3350);}
+  .card .pick{position:absolute; left:0; right:0; top:0; display:flex; align-items:center; justify-content:center;
+    color:#fff; font-weight:900; text-shadow:0 4px 10px rgba(0,0,0,.4);}
+  .card .nameBar{position:absolute; left:0; right:0; bottom:0; display:flex; align-items:center; justify-content:center;
+    background:linear-gradient(180deg, rgba(0,0,0,0), rgba(0,0,0,.42)); color:#fff; font-weight:900; text-shadow:0 2px 6px rgba(0,0,0,.5);}
+
+  /* 結果 */
+  #results{position:absolute; inset:0; padding:26px 80px; display:flex; flex-direction:column; align-items:center;}
+  #results h2{color:#fff; font-weight:900; font-size:52px; margin:2px 0 16px; text-shadow:0 4px 14px rgba(0,0,0,.5); letter-spacing:.08em;}
+  #rlist{width:100%; max-width:1400px; display:flex; flex-direction:column; gap:10px;}
+  .rrow{display:grid; grid-template-columns:120px 1fr auto; align-items:center; gap:24px;
+    background:rgba(255,255,255,.96); border-radius:14px; padding:9px 30px; box-shadow:0 6px 18px rgba(0,0,0,.32);}
+  .rrow .rank{font-weight:900; font-size:36px; color:#0b2a5b; text-align:center;}
+  .rrow.top1 .rank{color:#e0102a;}
+  .rrow .rname{font-weight:900; font-size:40px; color:#12203a; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;}
+  .rrow .rpts{font-weight:900; font-size:40px; color:#1a1a1a;}
+  .rrow.top1 .rpts{color:#e0102a;}
+  .rrow .rpts .u{font-size:.55em;}
+  #rpage{color:#fff; font-weight:900; font-size:24px; margin-top:14px; text-shadow:0 2px 8px rgba(0,0,0,.5);}
+
+  #measure{position:absolute; visibility:hidden; pointer-events:none; font-weight:900; line-height:1.2; white-space:pre-wrap; word-break:break-word; text-align:center;}
+</style>
+</head>
+<body>
+<div id="stage">
+  <div id="qbar" hidden></div>
+  <div id="qgrid" hidden></div>
+  <div id="grid" hidden></div>
+  <div id="results" hidden><h2>最終結果</h2><div id="rlist"></div><div id="rpage"></div></div>
+</div>
+<div id="measure"></div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+<script>
+const SUPABASE_URL = "https://ooukcrjaihuggeiajsqw.supabase.co";
+const SUPABASE_KEY = "sb_publishable_Gd8q6yFNdS1CtUDQK5NH0Q_tZv6L2A6";
+const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+const FONTS={gothic:'"Noto Sans JP",sans-serif',mincho:'"Noto Serif JP",serif',round:'"M PLUS Rounded 1c",sans-serif',pop:'"Reggae One",sans-serif',impact:'"Dela Gothic One",sans-serif',hand:'"Yusei Magic",sans-serif'};
+const LETTERS="ABCDEFGHI";
+const STAGE_W=1920, STAGE_H=1080;
+const stage=document.getElementById("stage"), qbar=document.getElementById("qbar"), qgrid=document.getElementById("qgrid"),
+  grid=document.getElementById("grid"), resultsEl=document.getElementById("results"), rlist=document.getElementById("rlist"),
+  rpage=document.getElementById("rpage"), measure=document.getElementById("measure");
+
+function fitStage(){ const s=Math.min(window.innerWidth/STAGE_W, window.innerHeight/STAGE_H); stage.style.transform="scale("+s+")"; }
+window.addEventListener("resize", ()=>{ fitStage(); render(); });
+fitStage();
+
+function fitInto(el,text,w,h,maxFs){
+  measure.style.fontFamily=stage.style.fontFamily||FONTS.gothic;
+  measure.style.width=w+"px";
+  let lo=8, hi=Math.floor(maxFs); measure.textContent=text||" ";
+  while(lo<hi){ const mid=Math.ceil((lo+hi)/2); measure.style.fontSize=mid+"px";
+    if(measure.scrollHeight<=h && measure.scrollWidth<=w+1) lo=mid; else hi=mid-1; }
+  el.style.fontSize=lo+"px"; return lo;
+}
+
+let disp={}, players=[];
+
+function counts(){
+  const opts=disp.options||[]; const c=new Array(opts.length).fill(0); const qid=disp.qid||"";
+  players.forEach(p=>{ if(p.qid===qid && p.choice>=0 && p.choice<c.length) c[p.choice]++; });
+  return c;
+}
+
+function render(){
+  const font=FONTS[disp.font]||FONTS.gothic; stage.style.fontFamily=font;
+  const mode=disp.mode||"quiz";
+  qbar.hidden=true; qgrid.hidden=true; grid.hidden=true; resultsEl.hidden=true;
+  qgrid.innerHTML=""; grid.innerHTML="";
+
+  if(mode==="results"){ renderResults(); return; }
+
+  const q=(disp.question||"").trim(); const opts=disp.options||[];
+  if(!disp.qid || !opts.length){
+    if(q){ qbar.hidden=false; qbar.textContent=q; fitInto(qbar,q,1840-92,220,90); }
+    return;
+  }
+  // 問題バー
+  qbar.hidden=false; qbar.textContent=q; fitInto(qbar,q,1840-92,200,84);
+  const barH=qbar.offsetHeight||120; const top=34+barH+30;
+
+  if(mode==="cards"){ renderCards(top); }
+  else { renderQuiz(top, opts); }
+}
+
+function renderQuiz(top, opts){
+  qgrid.hidden=false;
+  const availH=STAGE_H-top-50; qgrid.style.top=top+"px"; qgrid.style.height=availH+"px"; qgrid.style.alignItems="center";
+  const n=opts.length;
+  const cols = n<=3?1 : (n<=6?2 : 2);
+  const rows=Math.ceil(n/cols);
+  const gap=26;
+  const availW=STAGE_W-120;
+  const tileW=(availW-gap*(cols-1))/cols;
+  const tileH=Math.min((availH-gap*(rows-1))/rows, 230);
+  const revealed=!!disp.revealed; const correct=(disp.correctIndex==null)?-1:disp.correctIndex;
+  const showCounts=!!disp.showCounts; const c=counts();
+
+  opts.forEach((text,i)=>{
+    const t=document.createElement("div"); t.className="tile";
+    if(revealed){ if(i===correct) t.classList.add("correct"); else t.classList.add("dim"); }
+    t.style.width=tileW+"px"; t.style.height=tileH+"px"; t.style.animationDelay=(i*0.05)+"s";
+    const mk=document.createElement("div"); mk.className="mk"; mk.textContent=LETTERS[i]||(i+1);
+    const sz=Math.round(tileH*0.42); mk.style.width=sz+"px"; mk.style.height=sz+"px"; mk.style.fontSize=Math.round(sz*0.5)+"px";
+    const tx=document.createElement("div"); tx.className="tx"; tx.textContent=text;
+    t.append(mk,tx);
+    if(showCounts){ const cn=document.createElement("div"); cn.className="cnt"; cn.textContent=c[i]+"人"; cn.style.fontSize=Math.round(tileH*0.22)+"px"; t.append(cn); }
+    qgrid.appendChild(t);
+    fitInto(tx, text, tileW*0.62, tileH*0.7, tileH*0.5);
+  });
+}
+
+function renderCards(top){
+  grid.hidden=false;
+  const PAD=40, availH=STAGE_H-top-PAD, availW=STAGE_W-PAD*2;
+  grid.style.top=top+"px"; grid.style.height=availH+"px"; grid.style.alignContent="center"; grid.style.gap="26px";
+  const qid=disp.qid||""; const opts=disp.options||[];
+  const answered=players.filter(p=>p.qid===qid && p.choice>=0);
+  const list = answered.length?answered:players; // 誰も答えてなければ全員グレー
+  const n=Math.max(1,list.length);
+  let best={size:0,cols:1};
+  for(let cols=1;cols<=n;cols++){ const rows=Math.ceil(n/cols);
+    const cw=(availW-26*(cols-1))/cols, ch=(availH-26*(rows-1))/rows; const w=Math.min(cw,ch*4/3);
+    if(w>best.size) best={size:w,cols}; }
+  const w=best.size, h=w*3/4;
+  const revealed=!!disp.revealed; const correct=(disp.correctIndex==null)?-1:disp.correctIndex;
+
+  list.forEach((p,idx)=>{
+    const answeredThis = p.qid===qid && p.choice>=0;
+    const card=document.createElement("div");
+    card.className="card"+(!answeredThis?" none":(revealed && p.choice===correct?" correct":""));
+    card.style.width=w+"px"; card.style.height=h+"px"; card.style.animationDelay=(idx*0.05)+"s";
+    const nameH=Math.max(40,h*0.16), nameFs=Math.round(nameH*0.42);
+    const pick=document.createElement("div"); pick.className="pick"; pick.style.bottom=nameH+"px"; pick.style.top="0";
+    const inner=document.createElement("div");
+    inner.textContent = answeredThis ? (LETTERS[p.choice]||(p.choice+1)) : "―";
+    pick.appendChild(inner);
+    const bar=document.createElement("div"); bar.className="nameBar"; bar.style.height=nameH+"px"; bar.style.fontSize=nameFs+"px";
+    bar.textContent=p.name;
+    card.append(pick,bar); grid.appendChild(card);
+    inner.style.fontSize=Math.min((h-nameH)*0.6, w*0.5)+"px";
+  });
+}
+
+function renderResults(){
+  resultsEl.hidden=false;
+  const results=disp.results||[]; const per=10; const page=disp.resultsPage||0;
+  const slice=results.slice(page*per, page*per+per); rlist.innerHTML="";
+  slice.forEach(r=>{
+    const row=document.createElement("div"); row.className="rrow"+(r.rank===1?" top1":"");
+    const rk=document.createElement("div"); rk.className="rank"; rk.textContent=r.rank+"位";
+    const nm=document.createElement("div"); nm.className="rname"; nm.textContent=r.name;
+    const pt=document.createElement("div"); pt.className="rpts"; pt.textContent=(r.points??0);
+    const u=document.createElement("span"); u.className="u"; u.textContent="pt"; pt.appendChild(u);
+    row.append(rk,nm,pt); rlist.appendChild(row);
+  });
+  const totalPages=Math.max(1,Math.ceil(results.length/per));
+  rpage.textContent=results.length?`${page+1} / ${totalPages} ページ（${results.length}名）`:"参加者がいません";
+}
+
+window.renderPayload=(p)=>{ disp=p||{}; render(); };
+window.setPlayers=(arr)=>{ players=arr||[]; render(); };
+
+const params=new URLSearchParams(location.search);
+const room=(params.get("room")||"").trim();
+
+async function start(){
+  if(!room){ disp={question:"URLに ?room=ルームコード を付けてください"}; render(); return; }
+  const [d,pl]=await Promise.all([
+    sb.from("quiz_select_display").select("payload").eq("room_code",room).maybeSingle(),
+    sb.from("quiz_select_players").select("*").eq("room_code",room),
+  ]);
+  if(d.data&&d.data.payload) disp=d.data.payload;
+  players=pl.data||[]; render();
+
+  sb.channel("sel-disp-"+room)
+    .on("postgres_changes",{event:"*",schema:"public",table:"quiz_select_display",filter:"room_code=eq."+room},
+      p=>{ if(p.new&&p.new.payload){ disp=p.new.payload; render(); } })
+    .subscribe();
+  sb.channel("sel-disp-players-"+room)
+    .on("postgres_changes",{event:"*",schema:"public",table:"quiz_select_players",filter:"room_code=eq."+room},
+      ()=>reloadPlayers())
+    .subscribe();
+  setInterval(reloadPlayers, 15000);
+}
+async function reloadPlayers(){
+  const { data } = await sb.from("quiz_select_players").select("*").eq("room_code",room);
+  players=data||[]; render();
+}
+start();
+</script>
+</body>
+</html>

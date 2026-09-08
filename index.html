@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>配信クイズツール</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@700;900&display=swap" rel="stylesheet">
+<style>
+  :root{--blue1:#1e6ae8;--blue2:#0b3fa0;--bg:#0e1524;--panel:#1a2338;--line:#2c3a5c;--text:#f2f5fb;--sub:#93a3c4;}
+  *{box-sizing:border-box;}
+  body{margin:0;min-height:100dvh;background:var(--bg);color:var(--text);
+    font-family:"Noto Sans JP",-apple-system,BlinkMacSystemFont,sans-serif;
+    display:flex;flex-direction:column;align-items:center;justify-content:center;gap:22px;padding:24px;}
+  h1{font-size:22px;font-weight:900;letter-spacing:.06em;margin:0;text-align:center;}
+  p.lead{color:var(--sub);font-weight:700;margin:0;text-align:center;font-size:14px;}
+  .cards{display:flex;gap:18px;flex-wrap:wrap;justify-content:center;width:100%;max-width:760px;}
+  .tool{flex:1;min-width:280px;background:var(--panel);border:1px solid var(--line);border-radius:18px;padding:22px;display:flex;flex-direction:column;gap:12px;}
+  .tool h2{margin:0;font-size:19px;font-weight:900;}
+  .tool p{margin:0;color:var(--sub);font-size:13px;font-weight:700;line-height:1.6;}
+  .links{display:flex;flex-direction:column;gap:8px;margin-top:4px;}
+  a.btn{display:block;text-align:center;text-decoration:none;color:#fff;font-weight:900;border-radius:10px;padding:12px;
+    background:linear-gradient(180deg,var(--blue1),var(--blue2));}
+  a.btn.sub{background:linear-gradient(180deg,#4a5878,#323d58);font-size:14px;}
+  .note{color:var(--sub);font-size:12px;text-align:center;max-width:640px;line-height:1.7;}
+</style>
+</head>
+<body>
+  <h1>配信クイズツール</h1>
+  <p class="lead">管理者用を開き、ルームコードを決めて、出てくるURLを回答者とOBSに配ってください。</p>
+  <div class="cards">
+    <div class="tool">
+      <h2>クイズツール（記述式）</h2>
+      <p>回答者が自由記述で答えるタイプ。回答をOBSに大きく表示し、正解演出やポイント発表ができます。</p>
+      <div class="links">
+        <a class="btn" href="admin.html">管理者用をひらく</a>
+        <a class="btn sub" href="answer.html">回答者用</a>
+        <a class="btn sub" href="display.html">OBS表示用</a>
+      </div>
+    </div>
+    <div class="tool">
+      <h2>クイズツール（選択式）</h2>
+      <p>2〜9択のクイズを出題。回答者はタップで回答、正解者に自動でポイントが入ります。集計や正解発表もOBSに表示できます。</p>
+      <div class="links">
+        <a class="btn" href="select-admin.html">管理者用をひらく</a>
+        <a class="btn sub" href="select-answer.html">回答者用</a>
+        <a class="btn sub" href="select-display.html">OBS表示用</a>
+      </div>
+    </div>
+  </div>
+  <p class="note">回答者用・OBS表示用は、管理者用で入室したときに表示される「?room=…」付きのURLを使ってください（このページのリンクはルーム未指定です）。</p>
+</body>
+</html>

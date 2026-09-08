@@ -1,0 +1,440 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>クイズ管理(選択式) - 管理者用</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@500;700;900&display=swap" rel="stylesheet">
+<style>
+  :root{ --blue1:#1e6ae8; --blue2:#0b3fa0; --red1:#f0343e; --red2:#a80c1c; --green:#1ba85a;
+    --bg:#0e1524; --panel:#1a2338; --panel2:#212c47; --line:#2c3a5c; --text:#f2f5fb; --sub:#93a3c4; }
+  *{box-sizing:border-box;}
+  [hidden]{display:none!important;}
+  body{margin:0; min-height:100vh; background:var(--bg); color:var(--text);
+    font-family:"Noto Sans JP",-apple-system,BlinkMacSystemFont,sans-serif; padding:18px 18px 120px;}
+  .wrap{max-width:1120px; margin:0 auto; display:flex; flex-direction:column; gap:14px;}
+  h1{font-size:17px; font-weight:900; letter-spacing:.08em; color:var(--sub); margin:0; text-align:center;}
+  h2{font-size:13px; font-weight:900; color:var(--sub); margin:0 0 8px; letter-spacing:.06em;}
+  .row{display:flex; gap:8px; flex-wrap:wrap; align-items:center;}
+  input[type=text], textarea, select{background:var(--panel); border:2px solid var(--line); border-radius:10px;
+    color:var(--text); font-size:15px; font-weight:700; padding:10px 14px; outline:none; font-family:inherit;}
+  textarea{resize:vertical; min-height:52px; line-height:1.4; width:100%;}
+  input[type=text]:focus, textarea:focus, select:focus{border-color:var(--blue1);}
+  input::placeholder, textarea::placeholder{color:#5f6f92; font-weight:500;}
+  button{border:none; border-radius:10px; font-family:inherit; font-weight:900; font-size:14px;
+    padding:11px 16px; cursor:pointer; color:#fff; background:linear-gradient(180deg,#4a5878,#323d58);}
+  button:active{transform:translateY(1px);}
+  button:disabled{opacity:.4; cursor:default;}
+  button.primary{background:linear-gradient(180deg,var(--blue1),var(--blue2)); font-size:16px; padding:13px 20px;}
+  button.gold{background:linear-gradient(180deg,#e8a11e,#a06b0b);}
+  button.green{background:linear-gradient(180deg,#1ba85a,#0c7a3e);}
+  button.danger{background:linear-gradient(180deg,var(--red1),var(--red2));}
+  .status{font-size:12px; font-weight:700; color:var(--sub); min-height:16px;}
+  .status.on{color:#39d98a;} .status.err{color:#ff6b6b;}
+  .card{background:var(--panel); border:1px solid var(--line); border-radius:12px; padding:14px;}
+  .links{display:flex; flex-direction:column; gap:6px; font-size:13px;}
+  .links .lrow{display:flex; gap:8px; align-items:center; flex-wrap:wrap;}
+  .links b{color:var(--sub); min-width:5.5em;}
+  .links code{background:var(--panel2); padding:4px 8px; border-radius:6px; font-size:12px; word-break:break-all; flex:1; min-width:200px;}
+  .links button{padding:6px 10px; font-size:12px;}
+
+  .optrow{display:flex; align-items:center; gap:10px; margin-top:8px;}
+  .optrow .letter{width:30px; text-align:center; font-weight:900; color:var(--sub);}
+  .optrow input[type=text]{flex:1;}
+  .optrow label.ok{display:flex; align-items:center; gap:5px; font-size:13px; font-weight:900; color:#8fe0b0; white-space:nowrap; cursor:pointer;}
+  .optrow label.ok input{width:20px; height:20px; accent-color:var(--green); margin:0;}
+  .optrow .rm{background:none; color:#5f6f92; padding:4px 8px; font-size:16px;}
+  .optrow .rm:hover{color:#ff6b6b;}
+  .qrow{display:flex; gap:8px; flex-wrap:wrap; align-items:center; margin-top:10px;}
+  .qrow select{flex:1; min-width:180px;}
+
+  .toolbar{display:flex; gap:8px; flex-wrap:wrap; align-items:center;}
+  .seg{display:flex; border:2px solid var(--line); border-radius:10px; overflow:hidden;}
+  .seg button{border-radius:0; background:var(--panel2); font-size:13px; padding:9px 14px; color:var(--sub);}
+  .seg button.active{background:linear-gradient(180deg,var(--blue1),var(--blue2)); color:#fff;}
+  .modechk{display:flex; align-items:center; gap:6px; font-size:13px; font-weight:900; cursor:pointer;
+    padding:9px 12px; border-radius:8px; border:2px solid #3d4f78; color:#9fc4ff; user-select:none;}
+  .modechk input{width:18px; height:18px; accent-color:var(--blue1); margin:0;}
+
+  /* 集計 */
+  .tally{display:flex; flex-direction:column; gap:6px;}
+  .tallyrow{display:flex; align-items:center; gap:10px; font-weight:900;}
+  .tallyrow .lt{width:30px; text-align:center; color:var(--sub);}
+  .tallyrow .bar{height:22px; border-radius:6px; background:linear-gradient(90deg,var(--blue1),var(--blue2)); min-width:2px; transition:width .3s;}
+  .tallyrow.correct .bar{background:linear-gradient(90deg,#1ba85a,#0c7a3e);}
+  .tallyrow .txt{flex:1; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; color:#dbe5f7; font-weight:700;}
+  .tallyrow .num{width:60px; text-align:right; color:#ffe14d;}
+
+  .players{display:flex; flex-direction:column; gap:8px;}
+  .player{display:grid; grid-template-columns:auto 1fr auto auto; gap:10px; align-items:center;
+    background:var(--panel); border:1px solid var(--line); border-radius:12px; padding:10px 12px;}
+  .ptbox{display:flex; align-items:center; gap:4px;}
+  .ptbox .pts{width:56px; background:var(--panel2); border:2px solid var(--line); border-radius:8px;
+    color:#ffe14d; font-size:16px; font-weight:900; padding:8px 4px; text-align:center; outline:none; font-family:inherit;}
+  .ptbtn{width:34px; height:38px; padding:0; font-size:20px; line-height:1; background:linear-gradient(180deg,#3a466a,#2a3652); border-radius:8px;}
+  .player .name{font-size:15px; font-weight:900; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;}
+  .pick{font-weight:900; font-size:15px; padding:6px 12px; border-radius:8px; background:var(--panel2); color:#9fc4ff; white-space:nowrap;}
+  .pick.none{color:#5f6f92;}
+  .pick.correct{background:linear-gradient(180deg,#1e6b45,#0f4a2e); color:#c8f5d8;}
+  .pick.wrong{background:linear-gradient(180deg,#5a2530,#3a141c); color:#ffc2c2;}
+  .del{background:none; color:#5f6f92; font-size:16px; padding:6px 8px;}
+  .del:hover{color:#ff6b6b;}
+  .empty{color:var(--sub); text-align:center; padding:26px 0; font-weight:700;}
+
+  .controls{position:fixed; left:0; right:0; bottom:0; background:rgba(14,21,36,.94); backdrop-filter:blur(6px);
+    border-top:1px solid var(--line); padding:12px 18px; display:flex; gap:10px; flex-wrap:wrap; align-items:center; justify-content:center;}
+  .controls .sep{flex:0 0 1px; height:32px; background:var(--line);}
+  .obsState{font-size:12px; font-weight:700; color:var(--sub); width:100%; text-align:center;}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>QUIZ CONTROL（選択式）— 管理者用</h1>
+
+  <div class="row">
+    <input type="text" id="roomInput" placeholder="ルームコード (好きな合言葉)" maxlength="32" autocomplete="off" style="flex:1; min-width:180px;">
+    <button class="primary" id="joinBtn">入室</button>
+    <span class="status" id="status"></span>
+  </div>
+
+  <div class="card links" id="links" style="display:none;">
+    <div class="lrow"><b>回答者用</b><code id="answerUrl"></code><button data-copy="answerUrl">コピー</button></div>
+    <div class="lrow"><b>OBS表示用</b><code id="displayUrl"></code><button data-copy="displayUrl">コピー</button></div>
+  </div>
+
+  <!-- 問題作成 -->
+  <div class="card" id="qpanel" style="display:none;">
+    <h2>問題作成（2〜9択）</h2>
+    <textarea id="qInput" placeholder="ここに問題文を入力"></textarea>
+    <div id="optList"></div>
+    <div class="qrow">
+      <button id="addOptBtn">＋ 選択肢を追加</button>
+      <span class="status" id="optHint">正解の選択肢の◯にチェックを入れてください</span>
+    </div>
+    <div class="qrow">
+      <button class="primary" id="publishBtn">📢 この問題を出題</button>
+      <button class="green" id="saveBtn">💾 保存</button>
+      <button id="clearBtn">入力クリア</button>
+      <button class="danger" id="hideQBtn">出題を消す</button>
+    </div>
+    <div class="qrow">
+      <select id="savedSelect"><option value="">― 保存した問題を選ぶ ―</option></select>
+      <button id="deleteSavedBtn">選択を削除</button>
+    </div>
+  </div>
+
+  <!-- 出題中の操作 -->
+  <div class="card" id="livePanel" style="display:none;">
+    <h2>出題中の操作</h2>
+    <div class="toolbar">
+      <span style="font-size:13px;font-weight:900;color:var(--sub);">OBS表示</span>
+      <div class="seg" id="modeSeg">
+        <button data-mode="quiz" class="active">問題+選択肢</button>
+        <button data-mode="cards">個人カード</button>
+      </div>
+      <label class="modechk"><input type="checkbox" id="countsChk">選択人数を表示</label>
+      <button class="gold" id="revealBtn">✅ 正解発表（正解者に+1）</button>
+    </div>
+    <div class="tally" id="tally" style="margin-top:12px;"></div>
+  </div>
+
+  <!-- 表示設定 -->
+  <div class="toolbar" id="viewTools" style="display:none;">
+    <label style="font-size:13px;font-weight:900;color:var(--sub);">OBSフォント</label>
+    <select id="fontSelect">
+      <option value="gothic">ゴシック(標準)</option>
+      <option value="round">丸ゴシック</option>
+      <option value="mincho">明朝</option>
+      <option value="pop">ポップ体</option>
+      <option value="impact">極太インパクト</option>
+      <option value="hand">手書き風</option>
+    </select>
+    <div class="sep" style="width:1px;height:28px;background:var(--line);"></div>
+    <button class="gold" id="resultsBtn">🏆 最終結果発表</button>
+    <button id="prevPageBtn" disabled>◀ 前の10名</button>
+    <button id="nextPageBtn" disabled>次の10名 ▶</button>
+    <button id="endResultsBtn" disabled>結果表示を終了</button>
+  </div>
+
+  <div class="players" id="players"><div class="empty">入室すると回答者が表示されます</div></div>
+</div>
+
+<div class="controls" id="controls" style="display:none;">
+  <button class="danger" id="resetBtn">リセット（回答クリア）</button>
+  <div class="obsState" id="obsState"></div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+<script>
+const SUPABASE_URL = "https://ooukcrjaihuggeiajsqw.supabase.co";
+const SUPABASE_KEY = "sb_publishable_Gd8q6yFNdS1CtUDQK5NH0Q_tZv6L2A6";
+const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+const $ = id => document.getElementById(id);
+const LETTERS="ABCDEFGHI";
+let room="", channel=null, pchannel=null;
+let players=[];
+const pendingPts=new Map();
+let currentCorrect=-1;             // 出題中の正解index(未発表でも管理者は保持)
+const awarded=new Set();           // 付与済みqid
+let disp={ mode:"quiz", qid:"", question:"", options:[], revealed:false, correctIndex:null, showCounts:false, font:"gothic", results:[], resultsPage:0 };
+
+function setStatus(m,c){ $("status").textContent=m; $("status").className="status "+(c||""); }
+function setObs(m){ $("obsState").textContent=m; }
+
+const params=new URLSearchParams(location.search);
+if(params.get("room")) $("roomInput").value=params.get("room").trim();
+$("joinBtn").addEventListener("click", join);
+$("roomInput").addEventListener("keydown", e=>{ if(e.key==="Enter") join(); });
+
+// ===== 選択肢入力欄 =====
+let optCount=0;
+function addOptRow(value){
+  if(optCount>=9) return;
+  optCount++;
+  const i=optCount-1;
+  const row=document.createElement("div"); row.className="optrow"; row.dataset.i=i;
+  const lt=document.createElement("div"); lt.className="letter"; lt.textContent=LETTERS[i];
+  const ok=document.createElement("label"); ok.className="ok";
+  const rb=document.createElement("input"); rb.type="radio"; rb.name="correctOpt"; rb.value=i;
+  ok.append(rb, document.createTextNode("正解"));
+  const tx=document.createElement("input"); tx.type="text"; tx.placeholder="選択肢"+LETTERS[i]; tx.value=value||"";
+  const rm=document.createElement("button"); rm.className="rm"; rm.textContent="✕"; rm.title="この選択肢を削除";
+  rm.addEventListener("click", ()=>{ if(optCount<=2){ setObs("選択肢は最低2つ必要です"); return; } row.remove(); relabel(); });
+  row.append(lt, ok, tx, rm);
+  $("optList").appendChild(row);
+}
+function relabel(){
+  const rows=[...$("optList").querySelectorAll(".optrow")];
+  optCount=rows.length;
+  rows.forEach((r,idx)=>{ r.dataset.i=idx; r.querySelector(".letter").textContent=LETTERS[idx];
+    r.querySelector('input[type=radio]').value=idx; r.querySelector('input[type=text]').placeholder="選択肢"+LETTERS[idx]; });
+}
+function readOptions(){
+  const rows=[...$("optList").querySelectorAll(".optrow")];
+  const opts=rows.map(r=>r.querySelector('input[type=text]').value.trim());
+  const checked=$("optList").querySelector('input[type=radio]:checked');
+  const correct = checked? [...$("optList").querySelectorAll('input[type=radio]')].indexOf(checked) : -1;
+  return { opts, correct };
+}
+$("addOptBtn").addEventListener("click", ()=>addOptRow(""));
+
+// ===== 入室 =====
+async function join(){
+  const r=$("roomInput").value.trim();
+  if(!r){ setStatus("ルームコードを入力してください","err"); return; }
+  room=r; $("joinBtn").disabled=true; $("roomInput").disabled=true; $("joinBtn").textContent="入室中"; setStatus("接続中…");
+  const base=location.href.replace(/[^/]*$/, "");
+  $("answerUrl").textContent=base+"select-answer.html?room="+encodeURIComponent(room);
+  $("displayUrl").textContent=base+"select-display.html?room="+encodeURIComponent(room);
+  $("links").style.display=""; $("qpanel").style.display=""; $("livePanel").style.display="";
+  $("viewTools").style.display="flex"; $("controls").style.display="flex";
+  if(optCount===0){ addOptRow(""); addOptRow(""); addOptRow(""); addOptRow(""); }
+  loadSaved();
+  try{
+    await reload();
+    const { data } = await sb.from("quiz_select_display").select("payload").eq("room_code",room).maybeSingle();
+    if(data&&data.payload){ disp=Object.assign(disp, data.payload); $("fontSelect").value=disp.font||"gothic"; syncModeSeg(); $("countsChk").checked=!!disp.showCounts; updateResultBtns(); }
+    subscribe();
+    setStatus(`ルーム「${room}」に接続中`,"on");
+  }catch(err){ setStatus("接続エラー: "+(err.message||err),"err"); $("joinBtn").disabled=false; $("roomInput").disabled=false; }
+}
+
+document.querySelectorAll("[data-copy]").forEach(btn=>{
+  btn.addEventListener("click", async()=>{ try{ await navigator.clipboard.writeText($(btn.dataset.copy).textContent);
+    btn.textContent="✓"; setTimeout(()=>btn.textContent="コピー",1200);}catch(e){} });
+});
+
+async function reload(){
+  const { data, error } = await sb.from("quiz_select_players").select("*").eq("room_code",room).order("created_at",{ascending:true});
+  if(error) throw error;
+  players=data||[]; renderPlayers(); renderTally();
+}
+function subscribe(){
+  if(pchannel) sb.removeChannel(pchannel);
+  pchannel=sb.channel("sel-admin-"+room)
+    .on("postgres_changes",{event:"*",schema:"public",table:"quiz_select_players",filter:"room_code=eq."+room},
+      payload=>{
+        if(payload.eventType==="INSERT") players.push(payload.new);
+        else if(payload.eventType==="UPDATE"){ const i=players.findIndex(p=>p.id===payload.new.id); if(i>=0) players[i]=payload.new; else players.push(payload.new); }
+        else if(payload.eventType==="DELETE") players=players.filter(p=>p.id!==payload.old.id);
+        renderPlayers(); renderTally();
+      }).subscribe();
+  setInterval(()=>reload().catch(()=>{}), 20000);
+}
+
+async function publishDisp(){
+  const { error } = await sb.from("quiz_select_display").upsert({ room_code:room, payload:disp, updated_at:new Date().toISOString() });
+  if(error){ setObs("送信エラー: "+error.message); return false; }
+  return true;
+}
+
+// ===== 出題 =====
+$("publishBtn").addEventListener("click", async()=>{
+  const { opts, correct } = readOptions();
+  const clean = opts.filter(o=>o.length>0);
+  if(clean.length<2){ setObs("選択肢を2つ以上入力してください"); return; }
+  if(correct<0 || !opts[correct]){ setObs("正解の選択肢にチェックを入れてください"); return; }
+  const q=$("qInput").value.trim();
+  if(!q){ setObs("問題文を入力してください"); return; }
+  // 空欄を除いた配列に対する正解indexを再計算
+  let ci=0, seen=-1;
+  for(let k=0;k<opts.length;k++){ if(opts[k].length>0){ if(k===correct){ seen=ci; } ci++; } }
+  currentCorrect = seen;
+  disp.qid = "q"+Date.now();
+  disp.question=q; disp.options=clean; disp.revealed=false; disp.correctIndex=null;
+  disp.showCounts=false; disp.mode="quiz"; disp.resultsPage=0; disp.results=[];
+  disp.font=$("fontSelect").value;
+  $("countsChk").checked=false; syncModeSeg();
+  if(await publishDisp()){ setObs(`出題しました（${clean.length}択）`); updateResultBtns(); }
+});
+
+$("hideQBtn").addEventListener("click", async()=>{
+  disp.qid=""; disp.question=""; disp.options=[]; disp.revealed=false; disp.correctIndex=null; disp.mode="quiz";
+  if(await publishDisp()) setObs("出題を消しました");
+});
+$("clearBtn").addEventListener("click", ()=>{ $("qInput").value=""; $("optList").innerHTML=""; optCount=0; addOptRow(""); addOptRow(""); addOptRow(""); addOptRow(""); $("qInput").focus(); });
+
+// ===== OBSモード / 集計 / 正解発表 =====
+function syncModeSeg(){ [...document.querySelectorAll("#modeSeg button")].forEach(b=>b.classList.toggle("active", b.dataset.mode===(disp.mode==="cards"?"cards":"quiz"))); }
+document.querySelectorAll("#modeSeg button").forEach(b=>{
+  b.addEventListener("click", async()=>{
+    if(disp.mode==="results") return;
+    disp.mode=b.dataset.mode; syncModeSeg();
+    if(await publishDisp()) setObs(b.dataset.mode==="cards"?"個人カード表示に切替":"問題+選択肢表示に切替");
+  });
+});
+$("countsChk").addEventListener("change", async()=>{ disp.showCounts=$("countsChk").checked; await publishDisp(); });
+
+$("revealBtn").addEventListener("click", async()=>{
+  if(!disp.qid){ setObs("先に問題を出題してください"); return; }
+  disp.revealed=true; disp.correctIndex=currentCorrect;
+  if(await publishDisp()){
+    // 正解者に+1（qidごとに一度だけ）
+    if(!awarded.has(disp.qid)){
+      awarded.add(disp.qid);
+      const winners=players.filter(p=>p.qid===disp.qid && p.choice===currentCorrect);
+      for(const p of winners){ p.points=(p.points||0)+1; await sb.from("quiz_select_players").update({points:p.points}).eq("id",p.id); }
+      renderPlayers();
+      setObs(`正解発表：${winners.length}人に+1しました`);
+    } else setObs("正解を発表しました");
+  }
+});
+
+// ===== フォント / 最終結果 =====
+$("fontSelect").addEventListener("change", async()=>{ disp.font=$("fontSelect").value; await publishDisp(); setObs("フォントを変更しました"); });
+function computeRanking(){
+  const sorted=players.slice().sort((a,b)=>(b.points||0)-(a.points||0));
+  let rank=0, prev=null, count=0;
+  return sorted.map(p=>{ count++; const pts=p.points||0; if(pts!==prev){ rank=count; prev=pts; } return {rank,name:p.name,points:pts}; });
+}
+function updateResultBtns(){
+  const on=disp.mode==="results"; const per=10, total=(disp.results||[]).length; const pages=Math.max(1,Math.ceil(total/per));
+  $("prevPageBtn").disabled=!on||(disp.resultsPage||0)<=0;
+  $("nextPageBtn").disabled=!on||(disp.resultsPage||0)>=pages-1;
+  $("endResultsBtn").disabled=!on;
+}
+$("resultsBtn").addEventListener("click", async()=>{ disp.results=computeRanking(); disp.resultsPage=0; disp.mode="results";
+  if(await publishDisp()){ setObs(`最終結果を表示中（全${disp.results.length}名）`); updateResultBtns(); } });
+$("nextPageBtn").addEventListener("click", async()=>{ disp.resultsPage=(disp.resultsPage||0)+1; if(await publishDisp()) updateResultBtns(); });
+$("prevPageBtn").addEventListener("click", async()=>{ disp.resultsPage=Math.max(0,(disp.resultsPage||0)-1); if(await publishDisp()) updateResultBtns(); });
+$("endResultsBtn").addEventListener("click", async()=>{ disp.mode="quiz"; if(await publishDisp()){ setObs("結果表示を終了しました"); syncModeSeg(); updateResultBtns(); } });
+
+// ===== リセット =====
+$("resetBtn").addEventListener("click", async()=>{
+  if(!confirm("全員の回答をクリアし、OBSの出題表示を消します。よろしいですか？\n(名前・ポイントは残ります)")) return;
+  await sb.from("quiz_select_players").update({ choice:-1, qid:"" }).eq("room_code",room);
+  players.forEach(p=>{ p.choice=-1; p.qid=""; });
+  disp.qid=""; disp.question=""; disp.options=[]; disp.revealed=false; disp.correctIndex=null; disp.mode="quiz";
+  await publishDisp(); renderPlayers(); renderTally(); updateResultBtns();
+  setObs("リセットしました");
+});
+
+// ===== 集計表示(管理画面) =====
+function renderTally(){
+  const box=$("tally"); box.innerHTML="";
+  if(!disp.qid || !(disp.options||[]).length){ box.innerHTML='<div class="status">出題するとここに集計が出ます</div>'; return; }
+  const c=new Array(disp.options.length).fill(0);
+  players.forEach(p=>{ if(p.qid===disp.qid && p.choice>=0 && p.choice<c.length) c[p.choice]++; });
+  const max=Math.max(1,...c);
+  disp.options.forEach((t,i)=>{
+    const row=document.createElement("div"); row.className="tallyrow"+(disp.revealed&&i===currentCorrect?" correct":"");
+    const lt=document.createElement("div"); lt.className="lt"; lt.textContent=LETTERS[i];
+    const txt=document.createElement("div"); txt.className="txt"; txt.textContent=t + (disp.revealed&&i===currentCorrect?" ✅":"");
+    const bar=document.createElement("div"); bar.className="bar"; bar.style.width=Math.round(c[i]/max*220)+"px";
+    const num=document.createElement("div"); num.className="num"; num.textContent=c[i]+"人";
+    row.append(lt, txt, bar, num); box.appendChild(row);
+  });
+}
+
+// ===== 参加者リスト =====
+function renderPlayers(){
+  const box=$("players"); box.innerHTML="";
+  if(!players.length){ box.innerHTML='<div class="empty">まだ回答者がいません。回答者用URLを共有してください。</div>'; return; }
+  players.forEach(p=>{
+    const row=document.createElement("div"); row.className="player";
+    const ptbox=document.createElement("div"); ptbox.className="ptbox";
+    const minus=document.createElement("button"); minus.className="ptbtn"; minus.textContent="−"; minus.addEventListener("click",()=>changePoints(p,-1));
+    const pts=document.createElement("input"); pts.className="pts"; pts.type="text"; pts.inputMode="numeric";
+    pts.value=pendingPts.has(p.id)?pendingPts.get(p.id):p.points;
+    pts.addEventListener("input",()=>pendingPts.set(p.id,pts.value));
+    pts.addEventListener("change", async()=>{ const v=parseInt(pts.value,10)||0; pts.value=v; pendingPts.delete(p.id); p.points=v; await sb.from("quiz_select_players").update({points:v}).eq("id",p.id); });
+    const plus=document.createElement("button"); plus.className="ptbtn"; plus.textContent="+"; plus.addEventListener("click",()=>changePoints(p,+1));
+    ptbox.append(minus,pts,plus);
+
+    const name=document.createElement("div"); name.className="name"; name.textContent=p.name;
+
+    const pick=document.createElement("div");
+    const answered = p.qid===disp.qid && p.choice>=0;
+    let cls="pick", label="―";
+    if(answered){ label=LETTERS[p.choice]||(p.choice+1);
+      if(disp.revealed){ cls += (p.choice===currentCorrect)?" correct":" wrong"; } }
+    else cls+=" none";
+    pick.className=cls; pick.textContent=label;
+
+    const del=document.createElement("button"); del.className="del"; del.textContent="✕"; del.title="削除";
+    del.addEventListener("click", async()=>{ if(!confirm(`「${p.name}」を削除しますか？`)) return;
+      await sb.from("quiz_select_players").delete().eq("id",p.id); players=players.filter(x=>x.id!==p.id); renderPlayers(); renderTally(); });
+
+    row.append(ptbox,name,pick,del); box.appendChild(row);
+  });
+}
+async function changePoints(p,delta){ p.points=(parseInt(p.points,10)||0)+delta; pendingPts.delete(p.id); renderPlayers(); await sb.from("quiz_select_players").update({points:p.points}).eq("id",p.id); }
+
+// ===== 保存問題(localStorage) =====
+const LS_KEY="quiz_select_saved";
+function getSaved(){ try{ return JSON.parse(localStorage.getItem(LS_KEY)||"[]"); }catch(e){ return []; } }
+function setSaved(a){ try{ localStorage.setItem(LS_KEY, JSON.stringify(a)); }catch(e){} }
+function loadSaved(){
+  const sel=$("savedSelect"); sel.innerHTML='<option value="">― 保存した問題を選ぶ ―</option>';
+  getSaved().forEach((q,i)=>{ const o=document.createElement("option"); o.value=String(i);
+    o.textContent=(q.question||"").slice(0,36)+(q.question.length>36?"…":"")+`（${(q.options||[]).length}択）`; sel.appendChild(o); });
+}
+$("saveBtn").addEventListener("click", ()=>{
+  const { opts, correct } = readOptions(); const clean=opts.filter(o=>o.length>0); const q=$("qInput").value.trim();
+  if(!q){ setObs("問題文が空です"); return; }
+  if(clean.length<2){ setObs("選択肢を2つ以上入力してください"); return; }
+  if(correct<0||!opts[correct]){ setObs("正解にチェックを入れてください"); return; }
+  let ci=0, seen=-1; for(let k=0;k<opts.length;k++){ if(opts[k].length>0){ if(k===correct) seen=ci; ci++; } }
+  const arr=getSaved(); arr.push({ question:q, options:clean, correctIndex:seen }); setSaved(arr); loadSaved(); setObs("問題を保存しました");
+});
+$("savedSelect").addEventListener("change", ()=>{
+  const v=$("savedSelect").value; if(v==="") return;
+  const q=getSaved()[parseInt(v,10)]; if(!q) return;
+  $("qInput").value=q.question||"";
+  $("optList").innerHTML=""; optCount=0;
+  (q.options||[]).forEach(o=>addOptRow(o));
+  // 正解ラジオを設定
+  const radios=$("optList").querySelectorAll('input[type=radio]');
+  if(radios[q.correctIndex]) radios[q.correctIndex].checked=true;
+});
+$("deleteSavedBtn").addEventListener("click", ()=>{
+  const v=$("savedSelect").value; if(v===""){ setObs("削除する問題を選んでください"); return; }
+  const arr=getSaved(); const idx=parseInt(v,10);
+  if(idx>=0&&idx<arr.length){ if(!confirm(`保存した問題を削除しますか？\n「${(arr[idx].question||"").slice(0,36)}」`)) return;
+    arr.splice(idx,1); setSaved(arr); loadSaved(); setObs("保存した問題を削除しました"); }
+});
+</script>
+</body>
+</html>

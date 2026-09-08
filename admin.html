@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>クイズ管理 - 管理者用</title>
+<title>クイズ管理(記述式) - 管理者用</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@500;700;900&display=swap" rel="stylesheet">
 <style>
@@ -102,7 +102,7 @@
 </head>
 <body>
 <div class="wrap">
-  <h1>QUIZ CONTROL — 管理者用</h1>
+  <h1>QUIZ CONTROL（記述式）— 管理者用</h1>
 
   <div class="row">
     <input type="text" id="roomInput" placeholder="ルームコード (好きな合言葉)" maxlength="32" autocomplete="off" style="flex:1; min-width:180px;">
@@ -131,10 +131,29 @@
     </div>
   </div>
 
+  <!-- 表示設定(フォント・結果発表) -->
+  <div class="toolbar" id="viewTools" style="display:none;">
+    <label style="font-size:13px;font-weight:900;color:var(--sub);">OBSフォント</label>
+    <select id="fontSelect">
+      <option value="gothic">ゴシック(標準)</option>
+      <option value="round">丸ゴシック</option>
+      <option value="mincho">明朝</option>
+      <option value="pop">ポップ体</option>
+      <option value="impact">極太インパクト</option>
+      <option value="hand">手書き風</option>
+    </select>
+    <div class="sep" style="width:1px;height:28px;background:var(--line);"></div>
+    <button class="gold" id="resultsBtn">🏆 最終結果発表</button>
+    <button id="prevPageBtn" disabled>◀ 前の10名</button>
+    <button id="nextPageBtn" disabled>次の10名 ▶</button>
+    <button id="endResultsBtn" disabled>結果表示を終了</button>
+  </div>
+
   <!-- 回答者リスト操作 -->
   <div class="toolbar" id="listTools" style="display:none;">
     <button id="checkAllBtn">☑ 全員を表示にチェック</button>
     <button id="uncheckAllBtn">▢ 表示チェックを全解除</button>
+    <button id="uncheckCorrectBtn">▢ 正解チェックを全解除</button>
     <label class="modechk"><input type="checkbox" id="autoAwardChk">正解で自動+1</label>
   </div>
 
@@ -164,7 +183,7 @@ const checks = new Map();               // id -> {show, correct}
 const pendingPts = new Map();           // id -> 入力中の未保存ポイント
 
 // 現在のOBS表示状態(部分更新のため保持)
-let display = { items: [], showPoints: false, contentMode: "answer", question: "" };
+let display = { items: [], showPoints: false, contentMode: "answer", question: "", font: "gothic", mode: "answers", results: [], resultsPage: 0 };
 
 function setStatus(msg, cls){ $("status").textContent = msg; $("status").className = "status " + (cls||""); }
 function setObsState(msg){ $("obsState").textContent = msg; }
@@ -189,6 +208,7 @@ async function join(){
   $("displayUrl").textContent = base + "display.html?room=" + encodeURIComponent(room);
   $("links").style.display = "";
   $("qpanel").style.display = "";
+  $("viewTools").style.display = "flex";
   $("listTools").style.display = "flex";
   $("controls").style.display = "flex";
 
@@ -198,9 +218,11 @@ async function join(){
     await reload();
     const { data } = await sb.from("quiz_display").select("payload").eq("room_code", room).maybeSingle();
     if (data && data.payload){
-      display = Object.assign({ items: [], showPoints:false, contentMode:"answer", question:"" }, data.payload);
+      display = Object.assign({ items: [], showPoints:false, contentMode:"answer", question:"", font:"gothic", mode:"answers", results:[], resultsPage:0 }, data.payload);
       $("qInput").value = display.question || "";
       $("showPointsChk").checked = !!display.showPoints;
+      $("fontSelect").value = display.font || "gothic";
+      updateResultBtns();
     }
     subscribe();
     setStatus(`ルーム「${room}」に接続中`, "on");
@@ -330,6 +352,52 @@ $("checkAllBtn").addEventListener("click", () => {
   renderPlayers();
 });
 $("uncheckAllBtn").addEventListener("click", () => { checks.forEach(c => c.show = false); renderPlayers(); });
+$("uncheckCorrectBtn").addEventListener("click", () => { checks.forEach(c => c.correct = false); renderPlayers(); });
+
+// ===== OBSフォント =====
+$("fontSelect").addEventListener("change", async () => {
+  display.font = $("fontSelect").value;
+  await publish();
+  setObsState("フォントを変更しました");
+});
+
+// ===== 最終結果発表 =====
+function computeRanking(){
+  const sorted = players.slice().sort((a,b) => (b.points||0) - (a.points||0));
+  let rank = 0, prev = null, count = 0;
+  return sorted.map(p => {
+    count++;
+    const pts = p.points || 0;
+    if (pts !== prev){ rank = count; prev = pts; }
+    return { rank, name: p.name, points: pts };
+  });
+}
+function updateResultBtns(){
+  const on = display.mode === "results";
+  const per = 10, total = (display.results || []).length;
+  const pages = Math.max(1, Math.ceil(total / per));
+  $("prevPageBtn").disabled = !on || (display.resultsPage || 0) <= 0;
+  $("nextPageBtn").disabled = !on || (display.resultsPage || 0) >= pages - 1;
+  $("endResultsBtn").disabled = !on;
+}
+$("resultsBtn").addEventListener("click", async () => {
+  display.results = computeRanking();
+  display.resultsPage = 0;
+  display.mode = "results";
+  if (await publish()){ setObsState(`最終結果を表示中（全${display.results.length}名）`); updateResultBtns(); }
+});
+$("nextPageBtn").addEventListener("click", async () => {
+  display.resultsPage = (display.resultsPage || 0) + 1;
+  if (await publish()) updateResultBtns();
+});
+$("prevPageBtn").addEventListener("click", async () => {
+  display.resultsPage = Math.max(0, (display.resultsPage || 0) - 1);
+  if (await publish()) updateResultBtns();
+});
+$("endResultsBtn").addEventListener("click", async () => {
+  display.mode = "answers"; display.items = []; display.contentMode = "answer";
+  if (await publish()){ setObsState("結果表示を終了しました"); updateResultBtns(); }
+});
 
 // ===== OBS 表示制御 =====
 function shownItems(){
@@ -348,15 +416,15 @@ async function publish(){
 $("showBtn").addEventListener("click", async () => {
   const items = shownItems();
   if (!items.length){ setObsState("「表示」にチェックが入っている回答者がいません"); return; }
-  display.items = items; display.contentMode = "answer"; display.showPoints = $("showPointsChk").checked;
-  if (await publish()) setObsState(`OBSに ${items.length}人 の回答を表示中`);
+  display.items = items; display.contentMode = "answer"; display.showPoints = $("showPointsChk").checked; display.mode = "answers";
+  if (await publish()){ setObsState(`OBSに ${items.length}人 の回答を表示中`); updateResultBtns(); }
 });
 
 $("showPtsBtn").addEventListener("click", async () => {
   const items = shownItems();
   if (!items.length){ setObsState("「表示」にチェックが入っている回答者がいません"); return; }
-  display.items = items; display.contentMode = "points";
-  if (await publish()) setObsState(`OBSに ${items.length}人 のポイントを表示中`);
+  display.items = items; display.contentMode = "points"; display.mode = "answers";
+  if (await publish()){ setObsState(`OBSに ${items.length}人 のポイントを表示中`); updateResultBtns(); }
 });
 
 $("showPointsChk").addEventListener("change", async () => {
@@ -365,8 +433,8 @@ $("showPointsChk").addEventListener("change", async () => {
 });
 
 $("hideBtn").addEventListener("click", async () => {
-  display.items = []; display.contentMode = "answer";
-  if (await publish()) setObsState("回答表示を消しました" + (display.question ? "（問題文は表示中）" : ""));
+  display.items = []; display.contentMode = "answer"; display.mode = "answers";
+  if (await publish()){ setObsState("回答表示を消しました" + (display.question ? "（問題文は表示中）" : "")); updateResultBtns(); }
 });
 
 $("resetBtn").addEventListener("click", async () => {
@@ -374,15 +442,15 @@ $("resetBtn").addEventListener("click", async () => {
   await sb.from("quiz_players").update({ answer: "" }).eq("room_code", room);
   checks.forEach(c => { c.show = false; c.correct = false; });
   players.forEach(p => p.answer = "");
-  display.items = []; display.contentMode = "answer";
-  await publish(); renderPlayers();
+  display.items = []; display.contentMode = "answer"; display.mode = "answers";
+  await publish(); renderPlayers(); updateResultBtns();
   setObsState("リセットしました");
 });
 
 // ===== 問題表示 =====
 $("qShowBtn").addEventListener("click", async () => {
-  display.question = $("qInput").value.trim();
-  if (await publish()) setObsState(display.question ? "問題文を表示しました" : "問題文が空です");
+  display.question = $("qInput").value.trim(); display.mode = "answers";
+  if (await publish()){ setObsState(display.question ? "問題文を表示しました" : "問題文が空です"); updateResultBtns(); }
 });
 $("qHideBtn").addEventListener("click", async () => {
   display.question = "";
