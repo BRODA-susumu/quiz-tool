@@ -29,6 +29,7 @@
     overflow:hidden; opacity:0; transform:scale(.94); animation:pop .3s cubic-bezier(.2,1.4,.4,1) forwards;
   }
   @keyframes pop{ to{opacity:1; transform:scale(1);} }
+  .tile.noanim, .card.noanim{ animation:none; opacity:1; transform:none; }
   .tile .mk{flex:0 0 auto; display:flex; align-items:center; justify-content:center;
     background:rgba(255,255,255,.22); border-radius:50%; font-weight:900;}
   .tile .tx{flex:1; text-align:center; line-height:1.2; white-space:pre-wrap; overflow-wrap:anywhere; word-break:break-word; text-shadow:0 3px 8px rgba(0,0,0,.4);}
@@ -88,7 +89,7 @@ const stage=document.getElementById("stage"), qbar=document.getElementById("qbar
   rpage=document.getElementById("rpage"), measure=document.getElementById("measure");
 
 function fitStage(){ const s=Math.min(window.innerWidth/STAGE_W, window.innerHeight/STAGE_H); stage.style.transform="scale("+s+")"; }
-window.addEventListener("resize", ()=>{ fitStage(); render(); });
+window.addEventListener("resize", ()=>{ fitStage(); render({force:true}); });
 fitStage();
 
 function fitInto(el,text,w,h,maxFs){
@@ -108,9 +109,48 @@ function counts(){
   return c;
 }
 
-function render(){
-  const font=FONTS[disp.font]||FONTS.gothic; stage.style.fontFamily=font;
+// ちらつき防止用の状態(前回どの構造を描いたか)
+let lastBaseSig=null, lastStructSig=null;
+function sigOf(){
   const mode=disp.mode||"quiz";
+  const q=(disp.question||"").trim();
+  const opts=(disp.options||[]).join("");
+  const base = mode+"|"+q+"|"+opts+"|"+(!!disp.revealed)+"|"+(disp.correctIndex==null?-1:disp.correctIndex)+"|"+(disp.font||"gothic");
+  let struct = base;
+  if(mode==="cards"){
+    const qid=disp.qid||"";
+    const answered=players.filter(p=>p.qid===qid && p.choice>=0);
+    const list=(answered.length?answered:players).slice().sort((a,b)=>((a.created_at>b.created_at)?1:-1));
+    struct += "|CARDS:"+list.map(p=>p.name+"="+((p.qid===qid&&p.choice>=0)?p.choice:"x")).join(",");
+  } else if(mode==="results"){
+    struct += "|RES:"+(disp.resultsPage||0)+":"+JSON.stringify(disp.results||[]);
+  } else {
+    struct += "|COUNTS:"+(!!disp.showCounts);
+  }
+  return { base, struct };
+}
+// 選択人数だけを既存タイルに反映(作り直さない)
+function updateCounts(){
+  const c=counts();
+  const tiles=qgrid.querySelectorAll(".tile");
+  tiles.forEach((t,i)=>{ const cn=t.querySelector(".cnt"); if(cn) cn.textContent=(c[i]||0)+"人"; });
+}
+
+function render(opt){
+  const force = opt && opt.force;
+  const { base, struct } = sigOf();
+  const m = disp.mode||"quiz";
+
+  // 構造が前回と同じなら作り直さない(=ちらつかない)。カウントだけ差分更新。
+  if(!force && struct===lastStructSig){
+    if(m!=="cards" && m!=="results" && disp.showCounts) updateCounts();
+    return;
+  }
+  const animate = force ? false : (base !== lastBaseSig);
+  lastBaseSig = base; lastStructSig = struct;
+
+  const font=FONTS[disp.font]||FONTS.gothic; stage.style.fontFamily=font;
+  const mode=m;
   qbar.hidden=true; qgrid.hidden=true; grid.hidden=true; resultsEl.hidden=true;
   qgrid.innerHTML=""; grid.innerHTML="";
 
@@ -125,11 +165,11 @@ function render(){
   qbar.hidden=false; qbar.textContent=q; fitInto(qbar,q,1840-92,200,84);
   const barH=qbar.offsetHeight||120; const top=34+barH+30;
 
-  if(mode==="cards"){ renderCards(top); }
-  else { renderQuiz(top, opts); }
+  if(mode==="cards"){ renderCards(top, animate); }
+  else { renderQuiz(top, opts, animate); }
 }
 
-function renderQuiz(top, opts){
+function renderQuiz(top, opts, animate){
   qgrid.hidden=false;
   const availH=STAGE_H-top-50; qgrid.style.top=top+"px"; qgrid.style.height=availH+"px"; qgrid.style.alignItems="center";
   const n=opts.length;
@@ -143,9 +183,9 @@ function renderQuiz(top, opts){
   const showCounts=!!disp.showCounts; const c=counts();
 
   opts.forEach((text,i)=>{
-    const t=document.createElement("div"); t.className="tile";
+    const t=document.createElement("div"); t.className="tile"+(animate?"":" noanim");
     if(revealed){ if(i===correct) t.classList.add("correct"); else t.classList.add("dim"); }
-    t.style.width=tileW+"px"; t.style.height=tileH+"px"; t.style.animationDelay=(i*0.05)+"s";
+    t.style.width=tileW+"px"; t.style.height=tileH+"px"; if(animate) t.style.animationDelay=(i*0.05)+"s";
     const mk=document.createElement("div"); mk.className="mk"; mk.textContent=LETTERS[i]||(i+1);
     const sz=Math.round(tileH*0.42); mk.style.width=sz+"px"; mk.style.height=sz+"px"; mk.style.fontSize=Math.round(sz*0.5)+"px";
     const tx=document.createElement("div"); tx.className="tx"; tx.textContent=text;
@@ -156,7 +196,7 @@ function renderQuiz(top, opts){
   });
 }
 
-function renderCards(top){
+function renderCards(top, animate){
   grid.hidden=false;
   const PAD=40, availH=STAGE_H-top-PAD, availW=STAGE_W-PAD*2;
   grid.style.top=top+"px"; grid.style.height=availH+"px"; grid.style.alignContent="center"; grid.style.gap="26px";
@@ -174,8 +214,8 @@ function renderCards(top){
   list.forEach((p,idx)=>{
     const answeredThis = p.qid===qid && p.choice>=0;
     const card=document.createElement("div");
-    card.className="card"+(!answeredThis?" none":(revealed && p.choice===correct?" correct":""));
-    card.style.width=w+"px"; card.style.height=h+"px"; card.style.animationDelay=(idx*0.05)+"s";
+    card.className="card"+(animate?"":" noanim")+(!answeredThis?" none":(revealed && p.choice===correct?" correct":""));
+    card.style.width=w+"px"; card.style.height=h+"px"; if(animate) card.style.animationDelay=(idx*0.05)+"s";
     const nameH=Math.max(40,h*0.16), nameFs=Math.round(nameH*0.42);
     const pick=document.createElement("div"); pick.className="pick"; pick.style.bottom=nameH+"px"; pick.style.top="0";
     const inner=document.createElement("div");

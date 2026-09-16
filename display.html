@@ -40,6 +40,7 @@
     animation:pop .35s cubic-bezier(.2,1.4,.4,1) forwards;
   }
   .card.correct{ background:linear-gradient(160deg,#f0343e,#a80c1c); }
+  .card.noanim{ animation:none; opacity:1; transform:none; }
   @keyframes pop{ to{opacity:1; transform:scale(1);} }
 
   .answer{
@@ -135,7 +136,7 @@ function fitStage(){
   const s = Math.min(window.innerWidth / STAGE_W, window.innerHeight / STAGE_H);
   stage.style.transform = "scale(" + s + ")";
 }
-window.addEventListener("resize", () => { fitStage(); render(lastPayload); });
+window.addEventListener("resize", () => { fitStage(); render(lastPayload, {force:true}); });
 fitStage();
 
 const MAX_CHARS = 9;
@@ -189,8 +190,27 @@ function ptSpan(cls, points, isTop){
   return s;
 }
 
-function render(payload){
-  lastPayload = payload || {};
+// ちらつき防止用の状態
+let lastBaseSig = null, lastStructSig = null;
+function sigOf(p){
+  const mode = p.mode || "answers";
+  const items = p.items || [];
+  const contentMode = p.contentMode || "answer";
+  const itemsId = items.map(it => (it.name||"")+""+(it.answer||"")+""+(it.correct?1:0)+""+(it.points||0)).join("");
+  const base = mode+"|"+((p.question||"").trim())+"|"+contentMode+"|"+(p.font||"gothic")+"|"+itemsId;
+  let struct = base + "|SP:"+(!!p.showPoints);
+  if (mode === "results") struct += "|RES:"+(p.resultsPage||0)+":"+JSON.stringify(p.results||[]);
+  return { base, struct };
+}
+
+function render(payload, opt){
+  const force = opt && opt.force;
+  if (payload) lastPayload = payload || {};
+  const { base, struct } = sigOf(lastPayload);
+  if (!force && struct === lastStructSig) return;   // 構造が同じなら作り直さない(ちらつき防止)
+  const animate = force ? false : (base !== lastBaseSig);
+  lastBaseSig = base; lastStructSig = struct;
+
   const font = FONTS[lastPayload.font] || FONTS.gothic;
   stage.style.fontFamily = font;
 
@@ -229,9 +249,9 @@ function render(payload){
 
   items.forEach((it, i) => {
     const card = document.createElement("div");
-    card.className = "card" + (it.correct ? " correct" : "");
+    card.className = "card" + (animate ? "" : " noanim") + (it.correct ? " correct" : "");
     card.style.width = L.w + "px"; card.style.height = L.h + "px";
-    card.style.animationDelay = (i * 0.06) + "s";
+    if (animate) card.style.animationDelay = (i * 0.06) + "s";
     const nameH = Math.max(44, L.h * 0.16);
     const nameFs = Math.round(nameH * 0.42);
     const isTop = maxPts > 0 && (it.points || 0) === maxPts;
